@@ -1,7 +1,7 @@
 package stl
 
 import (
-	"github.com/timleecasey/stllib/lib/tdm"
+	"github.com/timleecasey/stllib/lib/threed"
 	"log"
 	"neilpa.me/go-stl"
 	"os"
@@ -9,8 +9,8 @@ import (
 
 // a triangle within an stl file
 type Trap struct {
-	a, b, c tdm.Point
-	normal  tdm.Point
+	A, B, C threed.Point
+	Normal  threed.Point
 }
 
 // visit the traps within the model
@@ -19,10 +19,10 @@ type TrapVisitor func(t *Trap)
 // The representation of a STL model
 type Model struct {
 	Objs   *[]*Trap
-	bounds *tdm.Dim
+	bounds *threed.Dim
 }
 
-func (m *Model) Bounds() *tdm.Dim {
+func (m *Model) Bounds() *threed.Dim {
 	return m.bounds
 }
 
@@ -36,7 +36,7 @@ const (
 )
 
 // Given a point, adjust the dimension to form a bounding box
-func boundsOnPoint(d *tdm.Dim, p *tdm.Point) {
+func boundsOnPoint(d *threed.Dim, p *threed.Point) {
 	// minimal point
 	if p.X < d.From.X {
 		d.From.X = p.X
@@ -70,11 +70,11 @@ func LoadModel(nm string) (*Model, error) {
 		return nil, err
 	}
 
-	var bounds tdm.Dim
+	var bounds threed.Dim
 	ret.traverse(func(t *Trap) {
-		boundsOnPoint(&bounds, &t.a)
-		boundsOnPoint(&bounds, &t.b)
-		boundsOnPoint(&bounds, &t.c)
+		boundsOnPoint(&bounds, &t.A)
+		boundsOnPoint(&bounds, &t.B)
+		boundsOnPoint(&bounds, &t.C)
 	})
 
 	ret.bounds = &bounds
@@ -97,33 +97,33 @@ func (m *Model) openStl(nm string) error {
 	}
 
 	for _, face := range mesh.Faces {
-		x := tdm.Point{
+		x := threed.Point{
 			X: float64(face.Verts[X_PT][FIRST]),
 			Y: float64(face.Verts[Y_PT][FIRST]),
 			Z: float64(face.Verts[Z_PT][FIRST]),
 		}
-		y := tdm.Point{
+		y := threed.Point{
 			X: float64(face.Verts[X_PT][SECOND]),
 			Y: float64(face.Verts[Y_PT][SECOND]),
 			Z: float64(face.Verts[Z_PT][SECOND]),
 		}
-		z := tdm.Point{
+		z := threed.Point{
 			X: float64(face.Verts[X_PT][THIRD]),
 			Y: float64(face.Verts[Y_PT][THIRD]),
 			Z: float64(face.Verts[Z_PT][THIRD]),
 		}
 
-		normalPt := tdm.Point{
+		normalPt := threed.Point{
 			X: float64(face.Normal[X_PT]),
 			Y: float64(face.Normal[Y_PT]),
 			Z: float64(face.Normal[Z_PT]),
 		}
 
 		t := Trap{
-			a:      x,
-			b:      y,
-			c:      z,
-			normal: normalPt,
+			A:      x,
+			B:      y,
+			C:      z,
+			Normal: normalPt,
 		}
 		ta := append(*m.Objs, &t)
 		m.Objs = &ta

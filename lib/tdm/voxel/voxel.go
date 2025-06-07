@@ -1,8 +1,9 @@
 package voxel
 
 import (
+	"github.com/timleecasey/stllib/lib/aid3/sim/tooling"
 	"github.com/timleecasey/stllib/lib/stl"
-	"github.com/timleecasey/stllib/lib/tdm"
+	"github.com/timleecasey/stllib/lib/threed"
 )
 
 //type Voxel interface {
@@ -10,22 +11,22 @@ import (
 //}
 
 type cube struct {
-	side tdm.Side
-	dim  *tdm.Dim
+	side threed.Side
+	dim  *threed.Dim
 }
 
-func (c *cube) Bounds() *tdm.Dim {
+func (c *cube) Bounds() *threed.Dim {
 	return nil
 }
-func (c *cube) Sidedness(p *tdm.Point) tdm.Side {
-	return tdm.Out
+func (c *cube) Sidedness(p *tooling.Point) threed.Side {
+	return threed.Out
 }
 func (c *cube) Intersect(stl *stl.Model) {
 }
 
-func makeCube(dim *tdm.Dim) *cube {
+func makeCube(dim *threed.Dim) *cube {
 	ret := cube{
-		side: tdm.Out,
+		side: threed.Out,
 		dim:  dim,
 	}
 	return &ret
@@ -34,7 +35,7 @@ func makeCube(dim *tdm.Dim) *cube {
 type Voxel struct {
 	size   uint
 	cubes  *[][][]*cube // pointer to an array of pointers to cube
-	bounds *tdm.Dim
+	bounds *threed.Dim
 	model  *stl.Model
 }
 
@@ -46,7 +47,7 @@ func MakeVoxel(size uint, stl *stl.Model) *Voxel {
 	diffY := (bounds.From.Y - bounds.To.Y) / float64(size)
 	diffZ := (bounds.From.Z - bounds.To.Z) / float64(size)
 
-	init := tdm.Point{
+	init := tooling.Point{
 		X: bounds.From.X,
 		Y: bounds.From.Y,
 		Z: bounds.From.Z,
@@ -63,13 +64,13 @@ func MakeVoxel(size uint, stl *stl.Model) *Voxel {
 	for x = 0; x < size; x++ {
 		for y = 0; y < size; y++ {
 			for z = 0; z < size; z++ {
-				cubeDim := tdm.Dim{
-					From: tdm.Point{
+				cubeDim := threed.Dim{
+					From: tooling.Point{
 						X: init.X + float64(x)*diffX,
 						Y: init.Y + float64(y)*diffY,
 						Z: init.Z + float64(z)*diffZ,
 					},
-					To: tdm.Point{
+					To: tooling.Point{
 						X: init.X + float64(x)*diffX + diffX,
 						Y: init.Y + float64(y)*diffY + diffY,
 						Z: init.Z + float64(z)*diffZ + diffZ,
@@ -82,12 +83,12 @@ func MakeVoxel(size uint, stl *stl.Model) *Voxel {
 	return &ret
 }
 
-func (v *Voxel) Bounds() *tdm.Dim {
+func (v *Voxel) Bounds() *threed.Dim {
 	return v.bounds
 }
 
-func (v *Voxel) Sidedness(p *tdm.Point, e float64) tdm.Side {
-	return tdm.Out
+func (v *Voxel) Sidedness(p *tooling.Point, e float64) threed.Side {
+	return threed.Out
 }
 
 func (v *Voxel) Intersect(stl *stl.Model) {
