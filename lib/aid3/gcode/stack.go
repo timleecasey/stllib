@@ -12,8 +12,8 @@ const (
 )
 
 type CmdNode struct {
-	cmd  *Cmd
-	next *CmdNode
+	Cmd  *Cmd
+	Next *CmdNode
 }
 
 type Node struct {
@@ -53,22 +53,22 @@ type CmdList struct {
 
 func (cl *CmdList) AddCmd(c *Cmd) {
 	n := &CmdNode{
-		cmd:  c,
-		next: nil,
+		Cmd:  c,
+		Next: nil,
 	}
 
 	if cl.head == nil {
 		cl.head = n
 		cl.last = n
 	} else {
-		cl.last.next = n
+		cl.last.Next = n
 		cl.last = n
 	}
 
 	cl.size++
 }
 
-func (cl *CmdList) Traverse(f func(n *CmdNode) error) error {
+func (cl *CmdList) TraverseCmds(f func(n *CmdNode) error) error {
 	cur := cl.head
 	for cur != nil {
 		//
@@ -77,7 +77,7 @@ func (cl *CmdList) Traverse(f func(n *CmdNode) error) error {
 		if err := f(cur); err != nil {
 			return err
 		}
-		cur = cur.next
+		cur = cur.Next
 	}
 	return nil
 }

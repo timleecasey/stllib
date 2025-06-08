@@ -3,7 +3,6 @@ package gcode
 import (
 	"bufio"
 	"fmt"
-	"github.com/timleecasey/stllib/lib/aid3/sim/reality"
 	"log"
 	"os"
 	"strconv"
@@ -49,6 +48,7 @@ const (
 	CMD_UNKN = iota
 	CMD_ABSOLUTE
 	CMD_LINEAR
+	CMD_FEED
 	CMD_CW_ARC
 	CMD_CCW_ARC
 	CMD_SPINDLE_OFF
@@ -58,12 +58,19 @@ var debugTokenize = false
 var debugGcode = true
 
 type Cmd struct {
-	c      int
-	t      *Tok
-	sibs   *Tok
-	action func(a *reality.Affine)
+	c    int
+	t    *Tok
+	sibs *Tok
+	//action func(a *reality.Affine)
 	coords *Coords
 	//state func(ms *tooling.MachineState)
+}
+
+func (c *Cmd) CmdType() int {
+	return c.c
+}
+func (c *Cmd) Coords() *Coords {
+	return c.coords
 }
 
 func (c *Cmd) String() string {
@@ -112,6 +119,13 @@ type ParseTree struct {
 	stk      *Stk
 	cmds     *CmdList
 	curCmd   *Cmd
+}
+
+func (t *ParseTree) TraverseCmds(f func(cn *CmdNode) error) error {
+	if err := t.cmds.TraverseCmds(f); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (t *ParseTree) AddCmd(c *Cmd) {
@@ -189,7 +203,6 @@ func HandleToken(tree *ParseTree, n *Node) error {
 			c:      prevType,
 			t:      refTok,
 			sibs:   nil,
-			action: nil,
 			coords: &Coords{},
 		}
 		break
@@ -199,12 +212,12 @@ func HandleToken(tree *ParseTree, n *Node) error {
 			c:      CMD_UNKN,
 			t:      t,
 			sibs:   nil,
-			action: nil,
 			coords: &Coords{},
 		}
 		switch t.src {
 		case "M5", "M05": // Spindle off
 			tree.curCmd.c = CMD_SPINDLE_OFF
+			tree.AddCmd(tree.curCmd)
 			break
 
 		case "M0", "M00": // Program stop
@@ -233,7 +246,6 @@ func HandleToken(tree *ParseTree, n *Node) error {
 			c:      CMD_UNKN,
 			t:      t,
 			sibs:   nil,
-			action: nil,
 			coords: &Coords{},
 		}
 
@@ -246,14 +258,17 @@ func HandleToken(tree *ParseTree, n *Node) error {
 
 		case "G01", "G1": // Linear Interpolation
 			tree.curCmd.c = CMD_LINEAR
+			tree.AddCmd(tree.curCmd)
 			break
 
 		case "G02", "G2": // Clockwise Arc Interpolation
 			tree.curCmd.c = CMD_CW_ARC
+			tree.AddCmd(tree.curCmd)
 			break
 
 		case "G03", "G3": // Counter-clockwise Interpolation
 			tree.curCmd.c = CMD_CCW_ARC
+			tree.AddCmd(tree.curCmd)
 			break
 
 		case "G90": // Use absolute coordinates

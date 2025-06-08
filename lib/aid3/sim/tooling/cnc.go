@@ -22,4 +22,6 @@ type Cnc interface {
 	Axis() []int
 	ZeroPoint() *Point
 	Head() Head
+	FeedRate() float64
+	AssignFeedRate(f float64)
 }
