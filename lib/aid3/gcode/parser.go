@@ -6,6 +6,7 @@ import (
 	"github.com/timleecasey/stllib/lib/aid3/sim/reality"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -16,6 +17,7 @@ const (
 	TOK_NUMBER
 	TOK_COMMENT
 	TOK_PERCENT_SCOPE
+	TOK_BREAK
 	TOK_A
 	TOK_B
 	TOK_C
@@ -43,22 +45,77 @@ const (
 	CLS_UNKN
 )
 
+const (
+	CMD_UNKN = iota
+	CMD_ABSOLUTE
+	CMD_LINEAR
+	CMD_CW_ARC
+	CMD_CCW_ARC
+	CMD_SPINDLE_OFF
+)
+
 var debugTokenize = false
 var debugGcode = true
 
 type Cmd struct {
+	c      int
 	t      *Tok
 	sibs   *Tok
 	action func(a *reality.Affine)
+	coords *Coords
+	//state func(ms *tooling.MachineState)
+}
+
+func (c *Cmd) String() string {
+	if c == nil {
+		return "nil"
+	}
+
+	// smells
+	tstr := "--"
+	if c.t != nil {
+		tstr = c.t.src
+	}
+
+	coordStr := "--"
+	if c.coords != nil {
+		coordStr = fmt.Sprintf("X %v Y %v Z %v", c.coords.X, c.coords.Y, c.coords.Z)
+	}
+	return fmt.Sprintf("%v (%v) %v", tstr, c.c, coordStr)
 }
 
 type Settings struct {
+	absoluteCoords bool
+}
+
+type Coords struct {
+	X float64
+	Y float64
+	Z float64
+
+	A float64
+	B float64
+	C float64
+
+	F float64
+	// G is missing
+	H float64
+
+	I float64
+	J float64
+	K float64
 }
 
 type ParseTree struct {
 	settings *Settings
 	nodes    *NodeList
 	stk      *Stk
+	cmds     *CmdList
+	curCmd   *Cmd
+}
+
+func (t *ParseTree) AddCmd(c *Cmd) {
+	t.cmds.AddCmd(c)
 }
 
 type ParseError struct {
@@ -75,6 +132,8 @@ func Parse(srcFileNm string) (*ParseTree, error) {
 		settings: &Settings{},
 		nodes:    &NodeList{},
 		stk:      &Stk{},
+		cmds:     &CmdList{},
+		curCmd:   nil,
 	}
 
 	if err := Tokenize(tree, srcFileNm); err != nil {
@@ -91,13 +150,13 @@ func Parse(srcFileNm string) (*ParseTree, error) {
 
 func MakeGcodeCommands(t *ParseTree) error {
 	nl := t.nodes
-	if err := nl.Traverse(HandleToken); err != nil {
+	if err := nl.Traverse(t, HandleToken); err != nil {
 		return err
 	}
 	return nil
 }
 
-func HandleToken(n *Node) error {
+func HandleToken(tree *ParseTree, n *Node) error {
 	t := n.t
 	//
 	// As an example, G* may expect some amount of codes to follow, but not another G*
@@ -107,18 +166,52 @@ func HandleToken(n *Node) error {
 	// Also define an affine for the various pieces
 	// Build a slot grammar, run the affine transform as arguments from the slots.
 	//
+	// Cmd has Coords as a set of slots
+	//
+
+	if debugGcode {
+		log.Printf("Seeing %v\n", t.src)
+	}
 	switch t.tokType {
 	case TOK_N:
 		// This is the Nth part of the line.
 		break
+
+	case TOK_BREAK:
+		prevType := CMD_UNKN
+		var refTok *Tok
+		refTok = nil
+		if tree.curCmd != nil {
+			prevType = tree.curCmd.c
+			refTok = tree.curCmd.t
+		}
+		tree.curCmd = &Cmd{
+			c:      prevType,
+			t:      refTok,
+			sibs:   nil,
+			action: nil,
+			coords: &Coords{},
+		}
+		break
+
 	case TOK_M:
+		tree.curCmd = &Cmd{
+			c:      CMD_UNKN,
+			t:      t,
+			sibs:   nil,
+			action: nil,
+			coords: &Coords{},
+		}
 		switch t.src {
+		case "M5", "M05": // Spindle off
+			tree.curCmd.c = CMD_SPINDLE_OFF
+			break
+
 		case "M0", "M00": // Program stop
 		case "M1", "M01": // Optional program stop
 		case "M2", "M02": // end of program
 		case "M3", "M03": // Spindle on clockwise
 		case "M4", "M04": // Spindle on counterclockwise
-		case "M5", "M05": // Spindle off
 		case "M6", "M06": // Tool change
 		case "M7", "M07": // Coolant on (mist)
 		case "M8", "M08": // Coolant on
@@ -131,19 +224,43 @@ func HandleToken(n *Node) error {
 		case "M98": // Subprogram call
 		case "M99": // Subprogram end
 			break
+
 		default:
 			return genErr(fmt.Sprintf("Unknown M code %v @ %v", t.src, t.lnPos))
 		}
 	case TOK_G:
+		tree.curCmd = &Cmd{
+			c:      CMD_UNKN,
+			t:      t,
+			sibs:   nil,
+			action: nil,
+			coords: &Coords{},
+		}
+
 		switch t.src {
 		case "G17":
 		case "G18":
 		case "G21":
 		case "G00", "G0": // Rapid Positioning of Machine Tool
+			break
+
 		case "G01", "G1": // Linear Interpolation
+			tree.curCmd.c = CMD_LINEAR
+			break
+
 		case "G02", "G2": // Clockwise Arc Interpolation
+			tree.curCmd.c = CMD_CW_ARC
+			break
+
 		case "G03", "G3": // Counter-clockwise Interpolation
+			tree.curCmd.c = CMD_CCW_ARC
+			break
+
 		case "G90": // Use absolute coordinates
+			tree.curCmd.c = CMD_ABSOLUTE
+			tree.AddCmd(tree.curCmd)
+			break
+
 		case "G08", "G8": // Increment Speed
 		case "G09", "G9": // Decrement Speed
 		//
@@ -167,6 +284,7 @@ func HandleToken(n *Node) error {
 		case "G53", "G54", "G55", "G56", "G57", "G58", "G59": // Zero Offset Value
 		case "G80", "G85", "G86", "G87", "G88", "G89": // Process Description
 			break
+
 		default:
 			return genErr(fmt.Sprintf("Unknown G code %v @ %v", t.src, t.lnPos))
 		}
@@ -175,14 +293,93 @@ func HandleToken(n *Node) error {
 	case TOK_COMMENT:
 		break
 	case TOK_F:
-	case TOK_H:
-	case TOK_I:
-	case TOK_J:
-	case TOK_K:
-	case TOK_X:
-	case TOK_Y:
-	case TOK_Z:
+		if f, err := strconv.ParseFloat(t.src[1:], 64); tree.curCmd == nil || err != nil {
+			return genErr(fmt.Sprintf("Could not parse %v @ %v : %v", t.src, t.lnPos, err))
+		} else {
+			tree.curCmd.coords.F = f
+		}
 		break
+
+	case TOK_H:
+		if h, err := strconv.ParseFloat(t.src[1:], 64); tree.curCmd == nil || err != nil {
+			return genErr(fmt.Sprintf("Could not parse %v @ %v : %v", t.src, t.lnPos, err))
+		} else {
+			tree.curCmd.coords.H = h
+		}
+		break
+
+	case TOK_I:
+		if i, err := strconv.ParseFloat(t.src[1:], 64); tree.curCmd == nil || err != nil {
+			return genErr(fmt.Sprintf("Could not parse %v @ %v : %v", t.src, t.lnPos, err))
+		} else {
+			tree.curCmd.coords.I = i
+		}
+		break
+
+	case TOK_J:
+		if j, err := strconv.ParseFloat(t.src[1:], 64); tree.curCmd == nil || err != nil {
+			return genErr(fmt.Sprintf("Could not parse %v @ %v : %v", t.src, t.lnPos, err))
+		} else {
+			tree.curCmd.coords.J = j
+		}
+		break
+
+	case TOK_K:
+		if k, err := strconv.ParseFloat(t.src[1:], 64); tree.curCmd == nil || err != nil {
+			return genErr(fmt.Sprintf("Could not parse %v @ %v : %v", t.src, t.lnPos, err))
+		} else {
+			tree.curCmd.coords.K = k
+		}
+		break
+
+	case TOK_A:
+		if a, err := strconv.ParseFloat(t.src[1:], 64); tree.curCmd == nil || err != nil {
+			return genErr(fmt.Sprintf("Could not parse %v @ %v : %v", t.src, t.lnPos, err))
+		} else {
+			tree.curCmd.coords.A = a
+		}
+		break
+
+	case TOK_B:
+		if b, err := strconv.ParseFloat(t.src[1:], 64); tree.curCmd == nil || err != nil {
+			return genErr(fmt.Sprintf("Could not parse %v @ %v : %v", t.src, t.lnPos, err))
+		} else {
+			tree.curCmd.coords.B = b
+		}
+		break
+
+	case TOK_C:
+		if c, err := strconv.ParseFloat(t.src[1:], 64); tree.curCmd == nil || err != nil {
+			return genErr(fmt.Sprintf("Could not parse %v @ %v : %v", t.src, t.lnPos, err))
+		} else {
+			tree.curCmd.coords.C = c
+		}
+		break
+
+	case TOK_X:
+		if x, err := strconv.ParseFloat(t.src[1:], 64); tree.curCmd == nil || err != nil {
+			return genErr(fmt.Sprintf("Could not parse %v @ %v : %v", t.src, t.lnPos, err))
+		} else {
+			tree.curCmd.coords.X = x
+		}
+		break
+
+	case TOK_Y:
+		if y, err := strconv.ParseFloat(t.src[1:], 64); tree.curCmd == nil || err != nil {
+			return genErr(fmt.Sprintf("Could not parse %v @ %v : %v", t.src, t.lnPos, err))
+		} else {
+			tree.curCmd.coords.Y = y
+		}
+		break
+
+	case TOK_Z:
+		if z, err := strconv.ParseFloat(t.src[1:], 64); tree.curCmd == nil || err != nil {
+			return genErr(fmt.Sprintf("Could not parse %v @ %v : %v", t.src, t.lnPos, err))
+		} else {
+			tree.curCmd.coords.Z = z
+		}
+		break
+
 	case TOK_T:
 		switch t.src {
 		case "T1", "T01":
@@ -198,6 +395,10 @@ func HandleToken(n *Node) error {
 	default:
 		return genErr(fmt.Sprintf("Unknown token type %v @ %v", t.src, t.lnPos))
 	}
+	if debugGcode {
+		log.Printf("State %v\n", tree.curCmd)
+	}
+
 	return nil
 }
 
@@ -329,6 +530,14 @@ func parseLine(tree *ParseTree, ln string, lnMarker int) error {
 	if curI > 0 {
 		buildTok(cur, curI, lnMarker, position, stPos, nl)
 	}
+	//
+	t := &Tok{
+		src:     "_NL_",
+		tokType: TOK_BREAK,
+		lnPos:   lnMarker,
+		stPos:   stPos,
+	}
+	nl.Add(t)
 
 	return nil
 }

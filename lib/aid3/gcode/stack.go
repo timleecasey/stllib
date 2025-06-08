@@ -11,6 +11,11 @@ const (
 	MARKER = "_MARKER_"
 )
 
+type CmdNode struct {
+	cmd  *Cmd
+	next *CmdNode
+}
+
 type Node struct {
 	t    *Tok
 	next *Node
@@ -40,6 +45,43 @@ func (s *Stk) Pop() *Tok {
 	return n.t
 }
 
+type CmdList struct {
+	size int
+	head *CmdNode
+	last *CmdNode
+}
+
+func (cl *CmdList) AddCmd(c *Cmd) {
+	n := &CmdNode{
+		cmd:  c,
+		next: nil,
+	}
+
+	if cl.head == nil {
+		cl.head = n
+		cl.last = n
+	} else {
+		cl.last.next = n
+		cl.last = n
+	}
+
+	cl.size++
+}
+
+func (cl *CmdList) Traverse(f func(n *CmdNode) error) error {
+	cur := cl.head
+	for cur != nil {
+		//
+		// Visit a node and possibly eat tokens
+		//
+		if err := f(cur); err != nil {
+			return err
+		}
+		cur = cur.next
+	}
+	return nil
+}
+
 type NodeList struct {
 	size int
 	head *Node
@@ -64,13 +106,13 @@ func (l *NodeList) Add(t *Tok) {
 
 }
 
-func (l *NodeList) Traverse(f func(n *Node) error) error {
+func (l *NodeList) Traverse(t *ParseTree, f func(t *ParseTree, n *Node) error) error {
 	cur := l.head
 	for cur != nil {
 		//
 		// Visit a node and possibly eat tokens
 		//
-		if err := f(cur); err != nil {
+		if err := f(t, cur); err != nil {
 			return err
 		}
 		cur = cur.next
