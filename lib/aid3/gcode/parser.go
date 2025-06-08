@@ -15,6 +15,7 @@ const (
 	TOK_UNKN
 	TOK_NUMBER
 	TOK_COMMENT
+	TOK_META
 	TOK_PERCENT_SCOPE
 	TOK_BREAK
 	TOK_A
@@ -46,6 +47,7 @@ const (
 
 const (
 	CMD_UNKN = iota
+	CMD_META
 	CMD_ABSOLUTE
 	CMD_LINEAR
 	CMD_FEED
@@ -307,6 +309,9 @@ func HandleToken(tree *ParseTree, n *Node) error {
 		break
 	case TOK_COMMENT:
 		break
+	case TOK_META:
+		tree.curCmd.c = CMD_META
+		break
 	case TOK_F:
 		if f, err := strconv.ParseFloat(t.src[1:], 64); tree.curCmd == nil || err != nil {
 			return genErr(fmt.Sprintf("Could not parse %v @ %v : %v", t.src, t.lnPos, err))
@@ -440,7 +445,7 @@ func parseLine(tree *ParseTree, ln string, lnMarker int) error {
 
 	position := 0
 	stPos := 0
-	comment := false
+	meta := false
 	lineComment := false
 
 	//
@@ -454,17 +459,11 @@ func parseLine(tree *ParseTree, ln string, lnMarker int) error {
 	for _, r := range ln {
 		position++
 		cls := charClass(r)
-		//commentCh := "-"
-		//if comment {
-		//	commentCh = "T"
-		//}
-		//rStr := string(r)
-		//log.Printf("CLS %v rune '%v' #%v", cls, rStr, commentCh)
-		if comment || lineComment {
+		if meta || lineComment {
 			cur[curI] = r
 			curI++
 			if r == ')' {
-				comment = false
+				meta = false
 				buildTok(cur, curI, lnMarker, position, stPos, nl)
 				curI = 0
 				stPos = 0
@@ -475,21 +474,11 @@ func parseLine(tree *ParseTree, ln string, lnMarker int) error {
 		case CLS_WS:
 			if curI > 0 {
 				buildTok(cur, curI, lnMarker, position, stPos, nl)
-				//runeSl := cur[0:curI]
-				//tokStr := string(runeSl)
-				//log.Printf("TOK ln %v, %v: %v r# %v", lnMarker, position, string(cur[0:curI]), curI)
-				//tokType := tokenType(tokStr)
-				//t := &Tok{
-				//	src:     tokStr,
-				//	tokType: tokType,
-				//	lnPos:   lnMarker,
-				//	stPos:   stPos,
-				//}
-				//nl.Add(t)
 				curI = 0
 				stPos = 0
 			}
 			break
+
 		case CLS_DIGIT, CLS_LETTER:
 			if stPos == 0 {
 				stPos = position
@@ -497,19 +486,23 @@ func parseLine(tree *ParseTree, ln string, lnMarker int) error {
 			cur[curI] = r
 			curI++
 			break
+
 		case CLS_PUNCT:
 			switch r {
 			case ';':
 				lineComment = true
 				break
+
 			case '-':
 				cur[curI] = r
 				curI++
 				break
+
 			case '.':
 				cur[curI] = r
 				curI++
 				break
+
 			case '%':
 				//if lnMarker > 1 {
 				//	t := stk.Pop()
@@ -529,8 +522,9 @@ func parseLine(tree *ParseTree, ln string, lnMarker int) error {
 			case '(':
 				cur[curI] = r
 				curI++
-				comment = true
+				meta = true
 				break
+
 			default:
 				return genErr(fmt.Sprintf("Unknown PUNCT %v @ %v", string(r), lnMarker))
 			}
@@ -616,6 +610,8 @@ func charClass(r rune) int {
 func tokenType(tok string) int {
 	switch tok[0] {
 	case '(':
+		return TOK_META
+	case ';':
 		return TOK_COMMENT
 	case 'A':
 		return TOK_A
