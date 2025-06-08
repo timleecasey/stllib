@@ -3,6 +3,7 @@ package gcode
 import (
 	"bufio"
 	"fmt"
+	"github.com/timleecasey/stllib/lib/aid3/sim/reality"
 	"log"
 	"os"
 	"strings"
@@ -15,6 +16,9 @@ const (
 	TOK_NUMBER
 	TOK_COMMENT
 	TOK_PERCENT_SCOPE
+	TOK_A
+	TOK_B
+	TOK_C
 	TOK_F
 	TOK_G
 	TOK_H
@@ -39,7 +43,13 @@ const (
 	CLS_UNKN
 )
 
+var debugTokenize = false
+var debugGcode = true
+
 type Cmd struct {
+	t      *Tok
+	sibs   *Tok
+	action func(a *reality.Affine)
 }
 
 type Settings struct {
@@ -47,7 +57,8 @@ type Settings struct {
 
 type ParseTree struct {
 	settings *Settings
-	cmds     []*Cmd
+	nodes    *NodeList
+	stk      *Stk
 }
 
 type ParseError struct {
@@ -62,9 +73,135 @@ func Parse(srcFileNm string) (*ParseTree, error) {
 
 	tree := &ParseTree{
 		settings: &Settings{},
-		cmds:     make([]*Cmd, 0),
+		nodes:    &NodeList{},
+		stk:      &Stk{},
 	}
 
+	if err := Tokenize(tree, srcFileNm); err != nil {
+		return nil, err
+	}
+	log.Printf("Found %v tokens\n", tree.nodes.size)
+
+	if err := MakeGcodeCommands(tree); err != nil {
+		return nil, err
+	}
+
+	return tree, nil
+}
+
+func MakeGcodeCommands(t *ParseTree) error {
+	nl := t.nodes
+	if err := nl.Traverse(HandleToken); err != nil {
+		return err
+	}
+	return nil
+}
+
+func HandleToken(n *Node) error {
+	t := n.t
+	//
+	// As an example, G* may expect some amount of codes to follow, but not another G*
+	//
+	// If at G*, or other main type (M*), go forward to find the next non-arg token
+	// then take the token as a command and the rest as possbily empty siblings
+	// Also define an affine for the various pieces
+	// Build a slot grammar, run the affine transform as arguments from the slots.
+	//
+	switch t.tokType {
+	case TOK_N:
+		// This is the Nth part of the line.
+		break
+	case TOK_M:
+		switch t.src {
+		case "M0", "M00": // Program stop
+		case "M1", "M01": // Optional program stop
+		case "M2", "M02": // end of program
+		case "M3", "M03": // Spindle on clockwise
+		case "M4", "M04": // Spindle on counterclockwise
+		case "M5", "M05": // Spindle off
+		case "M6", "M06": // Tool change
+		case "M7", "M07": // Coolant on (mist)
+		case "M8", "M08": // Coolant on
+		case "M9", "M09": // Coolant off
+		case "M10": // Clamp on
+		case "M11": // Clamp off
+		case "M19": // Spindle orientation
+		case "M30": // Program end, return to start
+		case "M40": // Spindle gear at middle
+		case "M98": // Subprogram call
+		case "M99": // Subprogram end
+			break
+		default:
+			return genErr(fmt.Sprintf("Unknown M code %v @ %v", t.src, t.lnPos))
+		}
+	case TOK_G:
+		switch t.src {
+		case "G17":
+		case "G18":
+		case "G21":
+		case "G00", "G0": // Rapid Positioning of Machine Tool
+		case "G01", "G1": // Linear Interpolation
+		case "G02", "G2": // Clockwise Arc Interpolation
+		case "G03", "G3": // Counter-clockwise Interpolation
+		case "G90": // Use absolute coordinates
+		case "G08", "G8": // Increment Speed
+		case "G09", "G9": // Decrement Speed
+		//
+		// Speed
+		//
+		case "G93": // Linear Feed Units
+		case "G94": // Linear Feed Units
+		case "G95": // Linear Feed Units
+		case "G96": // Constant Surface Speed
+		case "G97": // Constant Spindle Speed
+		case "G61": // Exact Stop Mode
+		case "G04": // Wait time
+		//
+		// Drilling
+		//
+		case "G81": // Simple drilling
+		case "G82": // Simple drilling with dwell
+		case "G83": // Deep hole drilling
+		case "G84": // Tapping
+		case "G40", "G41", "G42", "G43", "G44": // Tool Offset Values
+		case "G53", "G54", "G55", "G56", "G57", "G58", "G59": // Zero Offset Value
+		case "G80", "G85", "G86", "G87", "G88", "G89": // Process Description
+			break
+		default:
+			return genErr(fmt.Sprintf("Unknown G code %v @ %v", t.src, t.lnPos))
+		}
+	case TOK_O:
+		break
+	case TOK_COMMENT:
+		break
+	case TOK_F:
+	case TOK_H:
+	case TOK_I:
+	case TOK_J:
+	case TOK_K:
+	case TOK_X:
+	case TOK_Y:
+	case TOK_Z:
+		break
+	case TOK_T:
+		switch t.src {
+		case "T1", "T01":
+			break
+		case "T2", "T02":
+			break
+		default:
+			return genErr(fmt.Sprintf("Unknown T type %v @ %v", t.src, t.lnPos))
+		}
+		break
+	case TOK_S:
+		break
+	default:
+		return genErr(fmt.Sprintf("Unknown token type %v @ %v", t.src, t.lnPos))
+	}
+	return nil
+}
+
+func Tokenize(t *ParseTree, srcFileNm string) error {
 	lines, err := readLines(srcFileNm)
 	if err != nil {
 		log.Printf("Could not open %v: %v\n", srcFileNm, err)
@@ -72,13 +209,13 @@ func Parse(srcFileNm string) (*ParseTree, error) {
 
 	for i := range lines {
 		ln := lines[i]
-		err := parseLine(tree, ln, i+1)
+		err := parseLine(t, ln, i+1)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return tree, nil
 
+	return nil
 }
 
 func parseLine(tree *ParseTree, ln string, lnMarker int) error {
@@ -88,6 +225,7 @@ func parseLine(tree *ParseTree, ln string, lnMarker int) error {
 	position := 0
 	stPos := 0
 	comment := false
+	lineComment := false
 
 	//
 	// Used for comments
@@ -95,7 +233,7 @@ func parseLine(tree *ParseTree, ln string, lnMarker int) error {
 	cur := make([]rune, 10000)
 	curI := 0
 
-	stk := Stk{}
+	nl := tree.nodes
 
 	for _, r := range ln {
 		position++
@@ -106,12 +244,12 @@ func parseLine(tree *ParseTree, ln string, lnMarker int) error {
 		//}
 		//rStr := string(r)
 		//log.Printf("CLS %v rune '%v' #%v", cls, rStr, commentCh)
-		if comment {
+		if comment || lineComment {
 			cur[curI] = r
 			curI++
 			if r == ')' {
 				comment = false
-				buildTok(cur, curI, lnMarker, position, stPos, &stk)
+				buildTok(cur, curI, lnMarker, position, stPos, nl)
 				curI = 0
 				stPos = 0
 			}
@@ -120,7 +258,7 @@ func parseLine(tree *ParseTree, ln string, lnMarker int) error {
 		switch cls {
 		case CLS_WS:
 			if curI > 0 {
-				buildTok(cur, curI, lnMarker, position, stPos, &stk)
+				buildTok(cur, curI, lnMarker, position, stPos, nl)
 				//runeSl := cur[0:curI]
 				//tokStr := string(runeSl)
 				//log.Printf("TOK ln %v, %v: %v r# %v", lnMarker, position, string(cur[0:curI]), curI)
@@ -131,7 +269,7 @@ func parseLine(tree *ParseTree, ln string, lnMarker int) error {
 				//	lnPos:   lnMarker,
 				//	stPos:   stPos,
 				//}
-				//stk.Push(t)
+				//nl.Add(t)
 				curI = 0
 				stPos = 0
 			}
@@ -145,9 +283,13 @@ func parseLine(tree *ParseTree, ln string, lnMarker int) error {
 			break
 		case CLS_PUNCT:
 			switch r {
+			case ';':
+				lineComment = true
+				break
 			case '-':
 				cur[curI] = r
 				curI++
+				break
 			case '.':
 				cur[curI] = r
 				curI++
@@ -165,7 +307,7 @@ func parseLine(tree *ParseTree, ln string, lnMarker int) error {
 				//		lnPos:   lnMarker,
 				//		stPos:   position,
 				//	}
-				//	stk.Push(t)
+				//	nl.Add(t)
 				//}
 				break
 			case '(':
@@ -185,7 +327,7 @@ func parseLine(tree *ParseTree, ln string, lnMarker int) error {
 		}
 	}
 	if curI > 0 {
-		buildTok(cur, curI, lnMarker, position, stPos, &stk)
+		buildTok(cur, curI, lnMarker, position, stPos, nl)
 	}
 
 	return nil
@@ -209,10 +351,12 @@ func readLines(fileNm string) ([]string, error) {
 	return lines, nil
 }
 
-func buildTok(cur []rune, curI int, lnMarker int, position int, stPos int, stk *Stk) {
+func buildTok(cur []rune, curI int, lnMarker int, position int, stPos int, nl *NodeList) {
 	runeSl := cur[0:curI]
 	tokStr := string(runeSl)
-	log.Printf("TOK ln %v, %v: %v r# %v", lnMarker, position, string(cur[0:curI]), curI)
+	if debugTokenize {
+		log.Printf("TOK ln %v, %v: %v r# %v", lnMarker, position, string(cur[0:curI]), curI)
+	}
 	tokType := tokenType(tokStr)
 	t := &Tok{
 		src:     tokStr,
@@ -220,7 +364,7 @@ func buildTok(cur []rune, curI int, lnMarker int, position int, stPos int, stk *
 		lnPos:   lnMarker,
 		stPos:   stPos,
 	}
-	stk.Push(t)
+	nl.Add(t)
 }
 
 func genErr(msg string) error {
@@ -249,6 +393,12 @@ func tokenType(tok string) int {
 	switch tok[0] {
 	case '(':
 		return TOK_COMMENT
+	case 'A':
+		return TOK_A
+	case 'B':
+		return TOK_B
+	case 'C':
+		return TOK_C
 	case 'F':
 		return TOK_F
 	case 'G':
