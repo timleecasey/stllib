@@ -27,34 +27,38 @@ func BuildCnc() Cnc {
 // Cnc
 //
 
-func (s3d Simple3d) FeedRate() float64 {
+func (s3d *Simple3d) FeedRate() float64 {
 	return s3d.feed
 }
 
-func (s3d Simple3d) AssignFeedRate(f float64) {
+func (s3d *Simple3d) AssignFeedRate(f float64) {
 	s3d.feed = f
 }
 
-func (s3d Simple3d) Axis() []int {
+func (s3d *Simple3d) Axis() []int {
 	ret := make([]int, 1)
 	ret[0] = 3
 	return ret
 }
 
-func (s3d Simple3d) ZeroPoint() *Point {
+func (s3d *Simple3d) ZeroPoint() *Point {
 	return s3d.zero
 }
 
-func (s3d Simple3d) Head() Head {
+func (s3d *Simple3d) Head() Head {
 	return s3d.head
 }
 
+func (s3d *Simple3d) FastFeedRate() float64 {
+	return 1000
+}
+
 // Head
-func (h SimpleHead) Pos() *Point {
+func (h *SimpleHead) Pos() *Point {
 	return h.pos
 }
 
-func (h SimpleHead) MoveTo(p *Point) {
+func (h *SimpleHead) MoveTo(p *Point) {
 	h.pos = p
 }
 

@@ -49,15 +49,15 @@ const (
 	CMD_UNKN = iota
 	CMD_META
 	CMD_ABSOLUTE
+	CMD_FAST
 	CMD_LINEAR
-	CMD_FEED
 	CMD_CW_ARC
 	CMD_CCW_ARC
 	CMD_SPINDLE_OFF
 )
 
 var debugTokenize = false
-var debugGcode = true
+var debugGcode = false
 
 type Cmd struct {
 	c    int
@@ -70,6 +70,9 @@ type Cmd struct {
 
 func (c *Cmd) CmdType() int {
 	return c.c
+}
+func (c *Cmd) Src() string {
+	return c.t.src
 }
 func (c *Cmd) Coords() *Coords {
 	return c.coords
@@ -256,6 +259,8 @@ func HandleToken(tree *ParseTree, n *Node) error {
 		case "G18":
 		case "G21":
 		case "G00", "G0": // Rapid Positioning of Machine Tool
+			tree.curCmd.c = CMD_FAST
+			tree.AddCmd(tree.curCmd)
 			break
 
 		case "G01", "G1": // Linear Interpolation

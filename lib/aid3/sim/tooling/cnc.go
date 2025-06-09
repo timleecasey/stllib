@@ -1,5 +1,7 @@
 package tooling
 
+import "fmt"
+
 const (
 	M_CncMilling = iota
 	M_CncLathe
@@ -18,10 +20,15 @@ type Point struct {
 	Z float64
 }
 
+func (p *Point) String() string {
+	return fmt.Sprintf("X:%v, Y:%v, Z:%v", p.X, p.Y, p.Z)
+}
+
 type Cnc interface {
 	Axis() []int
 	ZeroPoint() *Point
 	Head() Head
 	FeedRate() float64
 	AssignFeedRate(f float64)
+	FastFeedRate() float64
 }

@@ -1,6 +1,9 @@
 package reality
 
-import "github.com/timleecasey/stllib/lib/aid3/sim/tooling"
+import (
+	"fmt"
+	"github.com/timleecasey/stllib/lib/aid3/sim/tooling"
+)
 
 const (
 	TRANS_ROW = 3
@@ -17,6 +20,15 @@ const (
 // A 4x4 matrix [row, col] for 3d affines
 type Affine struct {
 	m [][]float64
+}
+
+func (a *Affine) String() string {
+	ln1 := fmt.Sprintf("%v %v %v %v", a.m[0][0], a.m[0][1], a.m[0][2], a.m[0][3])
+	ln2 := fmt.Sprintf("%v %v %v %v", a.m[1][0], a.m[1][1], a.m[1][2], a.m[1][3])
+	ln3 := fmt.Sprintf("%v %v %v %v", a.m[2][0], a.m[2][1], a.m[2][2], a.m[2][3])
+	ln4 := fmt.Sprintf("%v %v %v %v", a.m[3][0], a.m[3][1], a.m[3][2], a.m[3][3])
+	return fmt.Sprintf("%v\n%v\n%v\n%v", ln1, ln2, ln3, ln4)
+
 }
 
 type Velocity struct {
@@ -52,9 +64,9 @@ func Identity() *Affine {
 
 func Translate(x float64, y float64, z float64) *Affine {
 	id := Identity()
-	id.m[TRANS_ROW][TRANS_X] = x
-	id.m[TRANS_ROW][TRANS_Y] = y
-	id.m[TRANS_ROW][TRANS_Z] = z
+	id.m[TRANS_X][TRANS_ROW] = x
+	id.m[TRANS_Y][TRANS_ROW] = y
+	id.m[TRANS_Z][TRANS_ROW] = z
 	return id
 }
 

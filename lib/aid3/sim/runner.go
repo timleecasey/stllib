@@ -1,12 +1,14 @@
 package sim
 
 import (
-	"fmt"
 	"github.com/timleecasey/stllib/lib/aid3/gcode"
 	"github.com/timleecasey/stllib/lib/aid3/sim/reality"
 	"github.com/timleecasey/stllib/lib/aid3/sim/tooling"
+	"log"
 	"math"
 )
+
+var debugMove = true
 
 // Sim
 // TimeSlice is the time unit for running the sim
@@ -18,7 +20,7 @@ type Sim struct {
 	Steps     uint
 	Tool      tooling.Cnc
 	ToolHead  tooling.Head
-	Velocity  *reality.Velocity
+	//Velocity  *reality.Velocity
 }
 
 func (s *Sim) Start() {
@@ -33,64 +35,50 @@ func (s *Sim) Start() {
 
 	zero := tool.ZeroPoint()
 	head.MoveTo(zero)
+	s.Tool.AssignFeedRate(s.Tool.FastFeedRate())
 
-	s.Velocity = reality.Still()
+	//s.Velocity = reality.Still()
 }
 
 func (s *Sim) Run(tree *gcode.ParseTree) {
 
-	head := s.ToolHead
+	log.Printf("Start %v\n", s.Tool.Head().Pos())
 
-	for i := range s.Steps {
-		fmt.Printf("%v @ %v\n", i, head.Pos())
-		diff := reality.Still()
-		diff.X = s.Velocity.X * s.TimeSlice
-		diff.Y = s.Velocity.Y * s.TimeSlice
-		diff.Z = s.Velocity.Z * s.TimeSlice
-		affine := reality.Translate(diff.X, diff.Y, diff.Z)
-		newPos := affine.MultiplyPoint(head.Pos())
-		head.MoveTo(newPos)
-	}
+	cnt := 0
 
-	affine := reality.Identity()
-	timeStep := s.TimeSlice
 	tree.TraverseCmds(func(cn *gcode.CmdNode) error {
 		if cn.Cmd.Coords().F != 0 {
 			s.Tool.AssignFeedRate(cn.Cmd.Coords().F)
 		}
 		switch cn.Cmd.CmdType() {
+		case gcode.CMD_FAST:
+			s.Tool.AssignFeedRate(s.Tool.FastFeedRate())
+			cmdLinear(s, cn)
+			cnt++
+			break
 		case gcode.CMD_LINEAR:
-			curPt := s.ToolHead.Pos()
-			curFeedRate := s.Tool.FeedRate() // mm/s?
-			coords := cn.Cmd.Coords()
-			toPt := CmdToXYZ(coords, curPt)
-			slice := timeStep // s
-			distPerSlice := curFeedRate * slice
-			//
-			// The x,y,z diff over the time slice
-			//
-			diffPt := &tooling.Point{
-				X: toPt.X - curPt.X,
-				Y: toPt.Y - curPt.Y,
-				Z: toPt.Z - curPt.Z,
-			}
-
-			affine = reality.Translate(distPerSlice, distPerSlice, distPerSlice)
-
-			runLinearAffine(s, affine, toPt, diffPt, distPerSlice)
+			cmdLinear(s, cn)
+			cnt++
+		}
+		if debugMove {
+			log.Printf("After %v %v F: %v\n", cn.Cmd.Src(), s.Tool.Head().Pos(), s.Tool.FeedRate())
 		}
 		return nil
 	})
+	log.Printf("Ran %v commands\n", cnt)
+
 }
 
-func notClipped(to *tooling.Point, fr *tooling.Point, dist float64) bool {
-	return math.Abs(to.X-fr.X) > math.Abs(dist) &&
-		math.Abs(to.Y-fr.Y) > math.Abs(dist) &&
-		math.Abs(to.Z-fr.Z) > math.Abs(dist)
+func notClipped(to *tooling.Point, fr *tooling.Point, diffPt *tooling.Point) bool {
+	// So long as we have some distance to move greater than the diffPoint, in at least one direction, then move
+	return math.Abs(to.X-fr.X) > math.Abs(diffPt.X) ||
+		math.Abs(to.Y-fr.Y) > math.Abs(diffPt.Y) ||
+		math.Abs(to.Z-fr.Z) > math.Abs(diffPt.Z)
 }
 
-func runLinearAffine(s *Sim, affine *reality.Affine, toPt *tooling.Point, diffPt *tooling.Point, distPerSlice float64) {
-	for notClipped(s.ToolHead.Pos(), toPt, distPerSlice) {
+func runLinearAffine(s *Sim, affine *reality.Affine, toPt *tooling.Point, diffPt *tooling.Point) {
+	for notClipped(s.ToolHead.Pos(), toPt, diffPt) {
+		//log.Printf("LINEAR %v\n", s.ToolHead.Pos())
 		h := s.ToolHead
 		affine.MoveHeadBy(h)
 	}
