@@ -59,6 +59,7 @@ const (
 	CMD_INVERSE_TIME_FEED
 	CMD_FEED_PER_REVOLUTION
 	CMD_SPINDLE_SPEED
+	CMD_TOOL_CHANGE
 )
 
 var debugTokenize = false
@@ -236,7 +237,11 @@ func HandleToken(tree *ParseTree, n *Node) error {
 		case "M2", "M02": // end of program
 		case "M3", "M03": // Spindle on clockwise
 		case "M4", "M04": // Spindle on counterclockwise
-		case "M6", "M06": // Tool change
+			break
+
+		case "M6", "M06": // Manual tool change
+			break
+
 		case "M7", "M07": // Coolant on (mist)
 		case "M8", "M08": // Coolant on
 		case "M9", "M09": // Coolant off
@@ -445,15 +450,10 @@ func HandleToken(tree *ParseTree, n *Node) error {
 		break
 
 	case TOK_T:
-		switch t.src {
-		case "T1", "T01":
-			break
-		case "T2", "T02":
-			break
-		default:
-			return genErr(fmt.Sprintf("Unknown T type %v @ %v", t.src, t.lnPos))
-		}
+		tree.curCmd.c = CMD_TOOL_CHANGE
+		tree.AddCmd(tree.curCmd)
 		break
+
 	case TOK_S:
 		tree.curCmd.c = CMD_SPINDLE_SPEED
 		tree.AddCmd(tree.curCmd)

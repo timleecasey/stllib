@@ -47,9 +47,13 @@ func (s *Sim) Run(tree *gcode.ParseTree) {
 	cnt := 0
 
 	tree.TraverseCmds(func(cn *gcode.CmdNode) error {
+		var err error
+		err = nil
+
 		if cn.Cmd.Coords().F != 0 {
 			s.Tool.AssignFeedRate(cn.Cmd.Coords().F)
 		}
+		
 		switch cn.Cmd.CmdType() {
 		case gcode.CMD_FAST:
 			s.Tool.AssignFeedRate(s.Tool.FastFeedRate())
@@ -70,8 +74,13 @@ func (s *Sim) Run(tree *gcode.ParseTree) {
 			cnt++
 			break
 
+		case gcode.CMD_TOOL_CHANGE:
+			err = cmdToolChange(s, cn)
+			cnt++
+			break
+
 		case gcode.CMD_SPINDLE_SPEED:
-			cmdSpindleSpeed(s, cn)
+			err = cmdSpindleSpeed(s, cn)
 			cnt++
 			break
 		case gcode.CMD_SPINDLE_OFF:
@@ -82,7 +91,7 @@ func (s *Sim) Run(tree *gcode.ParseTree) {
 		case gcode.CMD_FEED_PER_MIN_MODE:
 			s.Tool.FeedMode(tooling.FEED_PER_MINUTE)
 			cnt++
-		case gcode.CMD_INVERSE_TIME_FEED:
+		case gcode.CMD_INVERSE_TIME_FEED: // feed is time instead of rate
 			s.Tool.FeedMode(tooling.FEED_INVERSE_TIME)
 			cnt++
 		case gcode.CMD_FEED_PER_REVOLUTION:
@@ -93,7 +102,7 @@ func (s *Sim) Run(tree *gcode.ParseTree) {
 		if debugMove {
 			log.Printf("After %v %v F: %v\n", cn.Cmd.Src(), s.Tool.Head().Pos(), s.Tool.FeedRate())
 		}
-		return nil
+		return err
 	})
 	log.Printf("Ran %v commands\n", cnt)
 

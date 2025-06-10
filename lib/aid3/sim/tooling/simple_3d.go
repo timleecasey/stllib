@@ -6,6 +6,7 @@ type Simple3d struct {
 	feed          float64
 	feedPerMinute int
 	spindleSpeed  int64
+	curTool       int
 }
 type SimpleHead struct {
 	pos *Point
@@ -61,6 +62,10 @@ func (s3d *Simple3d) FeedMode(mode int) {
 
 func (s3d *Simple3d) SpindleSpeed(speed int64) {
 	s3d.spindleSpeed = speed
+}
+
+func (s3d *Simple3d) ToolChangeTo(tool int) {
+	s3d.curTool = tool
 }
 
 // Head
