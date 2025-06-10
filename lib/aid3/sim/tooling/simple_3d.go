@@ -1,9 +1,11 @@
 package tooling
 
 type Simple3d struct {
-	head Head
-	zero *Point
-	feed float64
+	head          Head
+	zero          *Point
+	feed          float64
+	feedPerMinute int
+	spindleSpeed  int64
 }
 type SimpleHead struct {
 	pos *Point
@@ -51,6 +53,14 @@ func (s3d *Simple3d) Head() Head {
 
 func (s3d *Simple3d) FastFeedRate() float64 {
 	return 1000
+}
+
+func (s3d *Simple3d) FeedMode(mode int) {
+	s3d.feedPerMinute = mode
+}
+
+func (s3d *Simple3d) SpindleSpeed(speed int64) {
+	s3d.spindleSpeed = speed
 }
 
 // Head

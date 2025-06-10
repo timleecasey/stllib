@@ -24,6 +24,12 @@ func (p *Point) String() string {
 	return fmt.Sprintf("X:%v, Y:%v, Z:%v", p.X, p.Y, p.Z)
 }
 
+const (
+	FEED_INVERSE_TIME = iota
+	FEED_PER_MINUTE
+	FEED_PER_REVOLUTION
+)
+
 type Cnc interface {
 	Axis() []int
 	ZeroPoint() *Point
@@ -31,4 +37,6 @@ type Cnc interface {
 	FeedRate() float64
 	AssignFeedRate(f float64)
 	FastFeedRate() float64
+	FeedMode(mode int)
+	SpindleSpeed(speed int64)
 }

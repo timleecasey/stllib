@@ -30,6 +30,7 @@ const (
 	TOK_M
 	TOK_N
 	TOK_O
+	TOK_R
 	TOK_S
 	TOK_T
 	TOK_X
@@ -54,6 +55,10 @@ const (
 	CMD_CW_ARC
 	CMD_CCW_ARC
 	CMD_SPINDLE_OFF
+	CMD_FEED_PER_MIN_MODE
+	CMD_INVERSE_TIME_FEED
+	CMD_FEED_PER_REVOLUTION
+	CMD_SPINDLE_SPEED
 )
 
 var debugTokenize = false
@@ -116,6 +121,7 @@ type Coords struct {
 	I float64
 	J float64
 	K float64
+	R float64
 }
 
 type ParseTree struct {
@@ -284,13 +290,26 @@ func HandleToken(tree *ParseTree, n *Node) error {
 			break
 
 		case "G08", "G8": // Increment Speed
-		case "G09", "G9": // Decrement Speed
+		case "G09", "G9": // Decrement Speed (exact stop?)
+			break
 		//
 		// Speed
 		//
 		case "G93": // Linear Feed Units
+			tree.curCmd.c = CMD_INVERSE_TIME_FEED
+			tree.AddCmd(tree.curCmd)
+			break
+
 		case "G94": // Linear Feed Units
+			tree.curCmd.c = CMD_FEED_PER_MIN_MODE
+			tree.AddCmd(tree.curCmd)
+			break
+
 		case "G95": // Linear Feed Units
+			tree.curCmd.c = CMD_INVERSE_TIME_FEED
+			tree.AddCmd(tree.curCmd)
+			break
+
 		case "G96": // Constant Surface Speed
 		case "G97": // Constant Spindle Speed
 		case "G61": // Exact Stop Mode
@@ -302,7 +321,19 @@ func HandleToken(tree *ParseTree, n *Node) error {
 		case "G82": // Simple drilling with dwell
 		case "G83": // Deep hole drilling
 		case "G84": // Tapping
-		case "G40", "G41", "G42", "G43", "G44": // Tool Offset Values
+		case "G40", "G41", "G42": // Tool Offset Values
+			break
+
+		case "G43": // Tool Offset Values
+			tree.curCmd.c = CMD_INVERSE_TIME_FEED
+			tree.AddCmd(tree.curCmd)
+			break
+
+		case "G44": // Tool Offset Values
+			tree.curCmd.c = CMD_INVERSE_TIME_FEED
+			tree.AddCmd(tree.curCmd)
+			break
+
 		case "G53", "G54", "G55", "G56", "G57", "G58", "G59": // Zero Offset Value
 		case "G80", "G85", "G86", "G87", "G88", "G89": // Process Description
 			break
@@ -405,6 +436,14 @@ func HandleToken(tree *ParseTree, n *Node) error {
 		}
 		break
 
+	case TOK_R:
+		if r, err := strconv.ParseFloat(t.src[1:], 64); tree.curCmd == nil || err != nil {
+			return genErr(fmt.Sprintf("Could not parse %v @ %v : %v", t.src, t.lnPos, err))
+		} else {
+			tree.curCmd.coords.R = r
+		}
+		break
+
 	case TOK_T:
 		switch t.src {
 		case "T1", "T01":
@@ -416,7 +455,10 @@ func HandleToken(tree *ParseTree, n *Node) error {
 		}
 		break
 	case TOK_S:
+		tree.curCmd.c = CMD_SPINDLE_SPEED
+		tree.AddCmd(tree.curCmd)
 		break
+
 	default:
 		return genErr(fmt.Sprintf("Unknown token type %v @ %v", t.src, t.lnPos))
 	}

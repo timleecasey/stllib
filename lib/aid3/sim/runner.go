@@ -59,6 +59,23 @@ func (s *Sim) Run(tree *gcode.ParseTree) {
 		case gcode.CMD_LINEAR:
 			cmdLinear(s, cn)
 			cnt++
+		case gcode.CMD_SPINDLE_SPEED:
+			cmdSpindleSpeed(s, cn)
+			cnt++
+		case gcode.CMD_SPINDLE_OFF:
+			s.Tool.SpindleSpeed(0)
+			cnt++
+
+		case gcode.CMD_FEED_PER_MIN_MODE:
+			s.Tool.FeedMode(tooling.FEED_PER_MINUTE)
+			cnt++
+		case gcode.CMD_INVERSE_TIME_FEED:
+			s.Tool.FeedMode(tooling.FEED_INVERSE_TIME)
+			cnt++
+		case gcode.CMD_FEED_PER_REVOLUTION:
+			s.Tool.FeedMode(tooling.FEED_PER_REVOLUTION)
+			cnt++
+
 		}
 		if debugMove {
 			log.Printf("After %v %v F: %v\n", cn.Cmd.Src(), s.Tool.Head().Pos(), s.Tool.FeedRate())
