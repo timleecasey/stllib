@@ -59,12 +59,25 @@ func (s *Sim) Run(tree *gcode.ParseTree) {
 		case gcode.CMD_LINEAR:
 			cmdLinear(s, cn)
 			cnt++
+			break
+
+		case gcode.CMD_CW_ARC:
+			cmdCwArch(s, cn)
+			cnt++
+			break
+		case gcode.CMD_CCW_ARC:
+			cmdCcwArch(s, cn)
+			cnt++
+			break
+
 		case gcode.CMD_SPINDLE_SPEED:
 			cmdSpindleSpeed(s, cn)
 			cnt++
+			break
 		case gcode.CMD_SPINDLE_OFF:
 			s.Tool.SpindleSpeed(0)
 			cnt++
+			break
 
 		case gcode.CMD_FEED_PER_MIN_MODE:
 			s.Tool.FeedMode(tooling.FEED_PER_MINUTE)

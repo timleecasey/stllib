@@ -1,5 +1,7 @@
 package sim
 
+import "github.com/timleecasey/stllib/lib/aid3/gcode"
+
 // Format 1: (G17) G02/03 X__ Y__ I__ J__ F__
 // (G18) G02/03 X__ Z__ I__ K__ F__
 // (G19) G02/03 Y__ Z__ J__ K__ F__
@@ -20,3 +22,10 @@ package sim
 // X/Y/Z X/Z/R xz plane y is constant
 // X/Y/Z Y/Z/R yz plane x is constant
 //
+
+func cmdCwArch(s *Sim, cn *gcode.CmdNode) {
+
+}
+func cmdCcwArch(s *Sim, cn *gcode.CmdNode) {
+
+}
