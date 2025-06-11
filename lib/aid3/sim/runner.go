@@ -1,11 +1,13 @@
 package sim
 
 import (
+	"fmt"
 	"github.com/timleecasey/stllib/lib/aid3/gcode"
 	"github.com/timleecasey/stllib/lib/aid3/sim/reality"
 	"github.com/timleecasey/stllib/lib/aid3/sim/tooling"
 	"log"
 	"math"
+	"os"
 )
 
 var debugMove = true
@@ -53,7 +55,7 @@ func (s *Sim) Run(tree *gcode.ParseTree) {
 		if cn.Cmd.Coords().F != 0 {
 			s.Tool.AssignFeedRate(cn.Cmd.Coords().F)
 		}
-		
+
 		switch cn.Cmd.CmdType() {
 		case gcode.CMD_FAST:
 			s.Tool.AssignFeedRate(s.Tool.FastFeedRate())
@@ -104,6 +106,8 @@ func (s *Sim) Run(tree *gcode.ParseTree) {
 		}
 		return err
 	})
+
+	writePathPoints(s.ToolHead)
 	log.Printf("Ran %v commands\n", cnt)
 
 }
@@ -119,9 +123,15 @@ func runLinearAffine(s *Sim, affine *reality.Affine, toPt *tooling.Point, diffPt
 	for notClipped(s.ToolHead.Pos(), toPt, diffPt) {
 		//log.Printf("LINEAR %v\n", s.ToolHead.Pos())
 		h := s.ToolHead
-		affine.MoveHeadBy(h)
+		moveHeadBy(h, affine)
 	}
 	s.ToolHead.MoveTo(toPt)
+}
+
+func moveHeadBy(h tooling.Head, affine *reality.Affine) {
+	cur := h.Pos()
+	newPt := affine.MultiplyPoint(cur)
+	h.MoveTo(newPt)
 }
 
 func CmdToXYZ(c *gcode.Coords, curPt *tooling.Point) *tooling.Point {
@@ -142,4 +152,17 @@ func CmdToXYZ(c *gcode.Coords, curPt *tooling.Point) *tooling.Point {
 	}
 
 	return ret
+}
+
+func writePathPoints(h tooling.Head) {
+
+	if f, err := os.Create("path.gcode"); err == nil {
+		defer f.Close()
+		h.Path(func(p *tooling.Point) {
+			ptStr := fmt.Sprintf("G1 %v %v %v\n", p.X, p.Y, p.Z)
+			_, err = f.WriteString(ptStr)
+		})
+	} else {
+		log.Printf("Could not write path.gcode : %v", err)
+	}
 }

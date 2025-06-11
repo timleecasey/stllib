@@ -8,8 +8,10 @@ type Simple3d struct {
 	spindleSpeed  int64
 	curTool       int
 }
+
 type SimpleHead struct {
-	pos *Point
+	pos  *Point
+	path []*Point
 }
 
 func BuildCnc() Cnc {
@@ -18,7 +20,8 @@ func BuildCnc() Cnc {
 	}
 
 	head := &SimpleHead{
-		pos: &Point{0, 0, 0},
+		pos:  &Point{0, 0, 0},
+		path: make([]*Point, 0),
 	}
 
 	ret.head = head
@@ -75,6 +78,13 @@ func (h *SimpleHead) Pos() *Point {
 
 func (h *SimpleHead) MoveTo(p *Point) {
 	h.pos = p
+	h.path = append(h.path, p)
+}
+
+func (h *SimpleHead) Path(f func(p *Point)) {
+	for i := range h.path {
+		f(h.path[i])
+	}
 }
 
 //func (h SimpleHead) MoveBy(a *reality.Affine) {

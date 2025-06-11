@@ -27,3 +27,5 @@ go.work.sum
 .idea/*
 stllib.iml
 sim
+
+path.gcode

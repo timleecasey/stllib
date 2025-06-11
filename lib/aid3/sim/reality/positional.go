@@ -83,9 +83,3 @@ func (a *Affine) MultiplyPoint(p *tooling.Point) *tooling.Point {
 
 	return &ret
 }
-
-func (a *Affine) MoveHeadBy(h tooling.Head) {
-	cur := h.Pos()
-	newPt := a.MultiplyPoint(cur)
-	h.MoveTo(newPt)
-}
