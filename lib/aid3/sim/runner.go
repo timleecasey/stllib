@@ -13,33 +13,24 @@ import (
 var debugMove = true
 
 // Sim
-// TimeSlice is the time unit for running the sim
+// TimeSlice is the time unit increment for running the sim
 // Head is the current position
-// Velocity is the Velocity of tool head
 // The unit is meters, so Velocity is m/s and Head position is measured in meter with respect to the tool zero point
 type Sim struct {
 	TimeSlice float64
-	Steps     uint
 	Tool      tooling.Cnc
 	ToolHead  tooling.Head
-	//Velocity  *reality.Velocity
 }
 
 func (s *Sim) Start() {
 	s.TimeSlice = 0.001
-	s.Steps = 10
 
 	tool := tooling.BuildCnc()
 	head := tool.Head()
+	tool.Reset()
 
 	s.ToolHead = head
 	s.Tool = tool
-
-	zero := tool.ZeroPoint()
-	head.MoveTo(zero)
-	s.Tool.AssignFeedRate(s.Tool.FastFeedRate())
-
-	//s.Velocity = reality.Still()
 }
 
 func (s *Sim) Run(tree *gcode.ParseTree) {
@@ -93,13 +84,28 @@ func (s *Sim) Run(tree *gcode.ParseTree) {
 		case gcode.CMD_FEED_PER_MIN_MODE:
 			s.Tool.FeedMode(tooling.FEED_PER_MINUTE)
 			cnt++
+			break
 		case gcode.CMD_INVERSE_TIME_FEED: // feed is time instead of rate
 			s.Tool.FeedMode(tooling.FEED_INVERSE_TIME)
 			cnt++
+			break
 		case gcode.CMD_FEED_PER_REVOLUTION:
 			s.Tool.FeedMode(tooling.FEED_PER_REVOLUTION)
 			cnt++
+			break
 
+		case gcode.CMD_PLANE_XY:
+			s.Tool.SelectPlane(tooling.PLANE_XY)
+			cnt++
+			break
+		case gcode.CMD_PLANE_XZ:
+			s.Tool.SelectPlane(tooling.PLANE_XZ)
+			cnt++
+			break
+		case gcode.CMD_PLANE_YZ:
+			s.Tool.SelectPlane(tooling.PLANE_YZ)
+			cnt++
+			break
 		}
 		if debugMove {
 			log.Printf("After %v %v F: %v\n", cn.Cmd.Src(), s.Tool.Head().Pos(), s.Tool.FeedRate())
@@ -121,7 +127,6 @@ func notClipped(to *tooling.Point, fr *tooling.Point, diffPt *tooling.Point) boo
 
 func runLinearAffine(s *Sim, affine *reality.Affine, toPt *tooling.Point, diffPt *tooling.Point) {
 	for notClipped(s.ToolHead.Pos(), toPt, diffPt) {
-		//log.Printf("LINEAR %v\n", s.ToolHead.Pos())
 		h := s.ToolHead
 		moveHeadBy(h, affine)
 	}

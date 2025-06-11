@@ -1,12 +1,13 @@
 package tooling
 
 type Simple3d struct {
-	head          Head
-	zero          *Point
-	feed          float64
-	feedPerMinute int
-	spindleSpeed  int64
-	curTool       int
+	head         Head
+	zero         *Point
+	feed         float64
+	feedMode     int
+	spindleSpeed int64
+	curTool      int
+	plane        int
 }
 
 type SimpleHead struct {
@@ -15,9 +16,7 @@ type SimpleHead struct {
 }
 
 func BuildCnc() Cnc {
-	ret := &Simple3d{
-		zero: &Point{},
-	}
+	ret := &Simple3d{}
 
 	head := &SimpleHead{
 		pos:  &Point{0, 0, 0},
@@ -60,7 +59,7 @@ func (s3d *Simple3d) FastFeedRate() float64 {
 }
 
 func (s3d *Simple3d) FeedMode(mode int) {
-	s3d.feedPerMinute = mode
+	s3d.feedMode = mode
 }
 
 func (s3d *Simple3d) SpindleSpeed(speed int64) {
@@ -69,6 +68,19 @@ func (s3d *Simple3d) SpindleSpeed(speed int64) {
 
 func (s3d *Simple3d) ToolChangeTo(tool int) {
 	s3d.curTool = tool
+}
+
+func (s3d *Simple3d) SelectPlane(plane int) {
+	s3d.plane = plane
+}
+
+func (s3d *Simple3d) Reset() {
+	s3d.zero = &Point{}
+	s3d.plane = PLANE_XY
+	s3d.spindleSpeed = 0
+	s3d.feedMode = FEED_PER_MINUTE
+	s3d.feed = s3d.FastFeedRate()
+	s3d.head.MoveTo(s3d.zero)
 }
 
 // Head

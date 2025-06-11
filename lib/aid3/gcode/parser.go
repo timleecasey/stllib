@@ -60,18 +60,19 @@ const (
 	CMD_FEED_PER_REVOLUTION
 	CMD_SPINDLE_SPEED
 	CMD_TOOL_CHANGE
+	CMD_PLANE_XY
+	CMD_PLANE_XZ
+	CMD_PLANE_YZ
 )
 
 var debugTokenize = false
 var debugGcode = false
 
 type Cmd struct {
-	c    int
-	t    *Tok
-	sibs *Tok
-	//action func(a *reality.Affine)
+	c      int
+	t      *Tok
+	sibs   *Tok
 	coords *Coords
-	//state func(ms *tooling.MachineState)
 }
 
 func (c *Cmd) CmdType() int {
@@ -116,7 +117,7 @@ type Coords struct {
 	C float64
 
 	F float64
-	// G is missing
+	// G is missing, of course
 	H float64
 
 	I float64
@@ -185,7 +186,9 @@ func MakeGcodeCommands(t *ParseTree) error {
 func HandleToken(tree *ParseTree, n *Node) error {
 	t := n.t
 	//
-	// As an example, G* may expect some amount of codes to follow, but not another G*
+	// As an example, G* may expect some amount of codes to follow, including other G*
+	// G1 G9 X Y Z F, or move to position with exact stop
+	// G9 G1 X Y Z F, the same.
 	//
 	// If at G*, or other main type (M*), go forward to find the next non-arg token
 	// then take the token as a command and the rest as possbily empty siblings
@@ -267,7 +270,18 @@ func HandleToken(tree *ParseTree, n *Node) error {
 
 		switch t.src {
 		case "G17":
+			tree.curCmd.c = CMD_PLANE_XY
+			tree.AddCmd(tree.curCmd)
+			break
+
 		case "G18":
+			tree.curCmd.c = CMD_PLANE_XZ
+			tree.AddCmd(tree.curCmd)
+			break
+		case "G19":
+			tree.curCmd.c = CMD_PLANE_YZ
+			tree.AddCmd(tree.curCmd)
+			break
 		case "G21":
 		case "G00", "G0": // Rapid Positioning of Machine Tool
 			tree.curCmd.c = CMD_FAST

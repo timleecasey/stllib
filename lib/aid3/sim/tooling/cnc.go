@@ -30,6 +30,13 @@ const (
 	FEED_PER_REVOLUTION
 )
 
+const (
+	PLANE_NONE = iota
+	PLANE_XY
+	PLANE_XZ
+	PLANE_YZ
+)
+
 type Cnc interface {
 	Axis() []int
 	ZeroPoint() *Point
@@ -40,4 +47,6 @@ type Cnc interface {
 	FeedMode(mode int)
 	SpindleSpeed(speed int64)
 	ToolChangeTo(tool int)
+	SelectPlane(plane int)
+	Reset()
 }
