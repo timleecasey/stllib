@@ -8,6 +8,7 @@ type Simple3d struct {
 	spindleSpeed int64
 	curTool      int
 	plane        int
+	units        int
 }
 
 type SimpleHead struct {
@@ -81,6 +82,11 @@ func (s3d *Simple3d) Reset() {
 	s3d.feedMode = FEED_PER_MINUTE
 	s3d.feed = s3d.FastFeedRate()
 	s3d.head.MoveTo(s3d.zero)
+	s3d.units = UNIT_MM
+}
+
+func (s3d *Simple3d) Units(units int) {
+	s3d.units = units
 }
 
 // Head

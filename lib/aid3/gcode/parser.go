@@ -63,6 +63,8 @@ const (
 	CMD_PLANE_XY
 	CMD_PLANE_XZ
 	CMD_PLANE_YZ
+	CMD_INCH
+	CMD_MM
 )
 
 var debugTokenize = false
@@ -282,7 +284,14 @@ func HandleToken(tree *ParseTree, n *Node) error {
 			tree.curCmd.c = CMD_PLANE_YZ
 			tree.AddCmd(tree.curCmd)
 			break
+		case "G20":
+			tree.curCmd.c = CMD_INCH
+			tree.AddCmd(tree.curCmd)
+			break
 		case "G21":
+			tree.curCmd.c = CMD_MM
+			tree.AddCmd(tree.curCmd)
+			break
 		case "G00", "G0": // Rapid Positioning of Machine Tool
 			tree.curCmd.c = CMD_FAST
 			tree.AddCmd(tree.curCmd)

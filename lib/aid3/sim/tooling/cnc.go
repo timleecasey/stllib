@@ -37,6 +37,12 @@ const (
 	PLANE_YZ
 )
 
+const (
+	UNIT_NONE = iota
+	UNIT_INCH
+	UNIT_MM
+)
+
 type Cnc interface {
 	Axis() []int
 	ZeroPoint() *Point
@@ -49,4 +55,5 @@ type Cnc interface {
 	ToolChangeTo(tool int)
 	SelectPlane(plane int)
 	Reset()
+	Units(units int)
 }

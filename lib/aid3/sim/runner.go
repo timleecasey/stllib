@@ -106,6 +106,16 @@ func (s *Sim) Run(tree *gcode.ParseTree) {
 			s.Tool.SelectPlane(tooling.PLANE_YZ)
 			cnt++
 			break
+
+		case gcode.CMD_INCH:
+			s.Tool.Units(tooling.UNIT_INCH)
+			cnt++
+			break
+		case gcode.CMD_MM:
+			s.Tool.Units(tooling.UNIT_MM)
+			cnt++
+			break
+
 		}
 		if debugMove {
 			log.Printf("After %v %v F: %v\n", cn.Cmd.Src(), s.Tool.Head().Pos(), s.Tool.FeedRate())
