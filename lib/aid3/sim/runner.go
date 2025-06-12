@@ -10,7 +10,8 @@ import (
 	"os"
 )
 
-var debugMove = true
+var debugLinear = false
+var debugArc = true
 
 // Sim
 // TimeSlice is the time unit increment for running the sim
@@ -20,6 +21,7 @@ type Sim struct {
 	TimeSlice float64
 	Tool      tooling.Cnc
 	ToolHead  tooling.Head
+	Tolerance float64
 }
 
 func (s *Sim) Start() {
@@ -31,6 +33,8 @@ func (s *Sim) Start() {
 
 	s.ToolHead = head
 	s.Tool = tool
+
+	s.Tolerance = 0.01 // 0.01 mm?
 }
 
 func (s *Sim) Run(tree *gcode.ParseTree) {
@@ -59,11 +63,11 @@ func (s *Sim) Run(tree *gcode.ParseTree) {
 			break
 
 		case gcode.CMD_CW_ARC:
-			cmdCwArch(s, cn)
+			//cmdCwArch(s, cn)
 			cnt++
 			break
 		case gcode.CMD_CCW_ARC:
-			cmdCcwArch(s, cn)
+			//cmdCcwArch(s, cn)
 			cnt++
 			break
 
@@ -117,7 +121,7 @@ func (s *Sim) Run(tree *gcode.ParseTree) {
 			break
 
 		}
-		if debugMove {
+		if debugLinear {
 			log.Printf("After %v %v F: %v\n", cn.Cmd.Src(), s.Tool.Head().Pos(), s.Tool.FeedRate())
 		}
 		return err

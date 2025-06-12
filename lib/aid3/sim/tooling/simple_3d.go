@@ -74,6 +74,9 @@ func (s3d *Simple3d) ToolChangeTo(tool int) {
 func (s3d *Simple3d) SelectPlane(plane int) {
 	s3d.plane = plane
 }
+func (s3d *Simple3d) Plane() int {
+	return s3d.plane
+}
 
 func (s3d *Simple3d) Reset() {
 	s3d.zero = &Point{}
@@ -104,8 +107,3 @@ func (h *SimpleHead) Path(f func(p *Point)) {
 		f(h.path[i])
 	}
 }
-
-//func (h SimpleHead) MoveBy(a *reality.Affine) {
-//	newPos := a.MultiplyPoint(h.pos)
-//	h.pos = newPos
-//}

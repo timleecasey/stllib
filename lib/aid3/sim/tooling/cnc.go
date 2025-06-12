@@ -1,17 +1,20 @@
 package tooling
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 const (
-	M_CncMilling = iota
-	M_CncLathe
-	M_CncGrinder
-	M_CncDrill
-	M_CncRouter
-	M_CncLaserCutter
-	M_CncPlasmaCutter
-	M_CncWaterJetCutting
-	M_CncElectricDischargeMachines // (EDMs), but not the music
+	CncMilling = iota
+	CncLathe
+	CncGrinder
+	CncDrill
+	CncRouter
+	CncLaserCutter
+	CncPlasmaCutter
+	CncWaterJetCutting
+	CncElectricDischargeMachines // (EDMs), but not the music
 )
 
 type Point struct {
@@ -24,8 +27,16 @@ func (p *Point) String() string {
 	return fmt.Sprintf("X:%v, Y:%v, Z:%v", p.X, p.Y, p.Z)
 }
 
+func (p *Point) Dist(to *Point) float64 {
+	diffX := p.X - to.X
+	diffY := p.Y - to.Y
+	diffZ := p.Z - to.Z
+	return math.Sqrt((diffX * diffX) + (diffY * diffY) + (diffZ * diffZ))
+}
+
 const (
-	FEED_INVERSE_TIME = iota
+	FEED_NONE = iota
+	FEED_INVERSE_TIME
 	FEED_PER_MINUTE
 	FEED_PER_REVOLUTION
 )
@@ -54,6 +65,7 @@ type Cnc interface {
 	SpindleSpeed(speed int64)
 	ToolChangeTo(tool int)
 	SelectPlane(plane int)
+	Plane() int
 	Reset()
 	Units(units int)
 }
