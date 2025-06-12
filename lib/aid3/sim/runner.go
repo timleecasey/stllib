@@ -3,7 +3,6 @@ package sim
 import (
 	"fmt"
 	"github.com/timleecasey/stllib/lib/aid3/gcode"
-	"github.com/timleecasey/stllib/lib/aid3/sim/reality"
 	"github.com/timleecasey/stllib/lib/aid3/sim/tooling"
 	"log"
 	"math"
@@ -139,7 +138,7 @@ func notClipped(to *tooling.Point, fr *tooling.Point, diffPt *tooling.Point) boo
 		math.Abs(to.Z-fr.Z) > math.Abs(diffPt.Z)
 }
 
-func runLinearAffine(s *Sim, affine *reality.Affine, toPt *tooling.Point, diffPt *tooling.Point) {
+func runLinearAffine(s *Sim, affine *tooling.Affine, toPt *tooling.Point, diffPt *tooling.Point) {
 	for notClipped(s.ToolHead.Pos(), toPt, diffPt) {
 		h := s.ToolHead
 		moveHeadBy(h, affine)
@@ -147,7 +146,7 @@ func runLinearAffine(s *Sim, affine *reality.Affine, toPt *tooling.Point, diffPt
 	s.ToolHead.MoveTo(toPt)
 }
 
-func moveHeadBy(h tooling.Head, affine *reality.Affine) {
+func moveHeadBy(h tooling.Head, affine *tooling.Affine) {
 	cur := h.Pos()
 	newPt := affine.MultiplyPoint(cur)
 	h.MoveTo(newPt)

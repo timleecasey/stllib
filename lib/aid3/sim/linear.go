@@ -2,7 +2,6 @@ package sim
 
 import (
 	"github.com/timleecasey/stllib/lib/aid3/gcode"
-	"github.com/timleecasey/stllib/lib/aid3/sim/reality"
 	"github.com/timleecasey/stllib/lib/aid3/sim/tooling"
 	"math"
 )
@@ -31,7 +30,7 @@ func cmdLinear(s *Sim, cn *gcode.CmdNode) {
 		diffPt.Z = diffPt.Z / numIntersMoving
 
 		// The affine to apply per iteration
-		affine := reality.Translate(
+		affine := tooling.Translate(
 			diffPt.X,
 			diffPt.Y,
 			diffPt.Z)
