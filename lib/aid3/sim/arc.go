@@ -42,12 +42,11 @@ func cmdCwArch(s *Sim, cn *gcode.CmdNode) {
 
 	coords := cn.Cmd.Coords()
 	plane := s.Tool.Plane()
-	pos := s.ToolHead.Pos()
 
 	gcodeForm := figureOutArcCmdFormat(coords)
 	planeConst := establishPlaneConstant(plane)
 
-	angleStep := angleForTolerance(pos, coords, gcodeForm, planeConst, s.Tolerance)
+	angleStep := angleForTolerance(s, coords, gcodeForm, planeConst)
 	log.Printf("ANG STEP %v\n", angleStep)
 
 }
@@ -120,73 +119,119 @@ func cwArcIjkInXy(s *Sim, start [2]float64, cn *gcode.CmdNode, endAngle float64,
 
 }
 
-func angleForTolerance(fr *tooling.Point, c *gcode.Coords, cmdForm int, planeConst int, tolerance float64) float64 {
+func angleForTolerance(s *Sim, c *gcode.Coords, cmdForm int, planeConst int) float64 {
 	//func angleForTolerance(center *tooling.Point, fr *tooling.Point, to *tooling.Point, radius float64, tolerance float64) float64 {
 	outOfTolerance := true
 	var midAngle float64
 	var radius float64
+	var arc *tooling.Point
+	fr := s.ToolHead.Pos()
+	tolerance := s.Tolerance
 
 	to := &tooling.Point{
-		X: c.I,
-		Y: c.J,
-		Z: c.K,
+		X: c.X,
+		Y: c.Y,
+		Z: c.Z,
 	}
+
+	center := &tooling.Point{}
+	//center.X = fr.X + c.I
+	//center.Y = fr.Y + c.J
+	//center.Z = fr.Z + c.K
+	center.X = c.I
+	center.Y = c.J
+	center.Z = c.K
 
 	switch planeConst {
 	case planeXConst:
 		to.X = fr.X
+		center.X = fr.X
 		break
 	case planeYConst:
 		to.Y = fr.Y
+		center.Y = fr.Y
 		break
 	case planeZConst:
 		to.Z = fr.Z
+		center.Z = fr.Z
 		break
 	}
-
-	center := &tooling.Point{}
-	center.X = fr.X + c.I
-	center.Y = fr.Y + c.J
-	center.Z = fr.Z + c.K
 
 	switch cmdForm {
 	case formatRadius:
 		radius = math.Abs(c.R)
 		break
 	case formatCoords:
-		radius = math.Sqrt(c.I*c.I + c.J*c.J + c.K*c.K)
+		rX := math.Abs(to.X - fr.X)
+		rY := math.Abs(to.Y - fr.Y)
+		rZ := math.Abs(to.Z - fr.Z)
+		radius = math.Sqrt(rX*rX + rY*rY + rZ*rZ)
 		break
 	}
 
-	var mid *tooling.Point
-	mid = &tooling.Point{
-		X: (fr.X + to.X) / 2,
-		Y: (fr.Y + to.Y) / 2,
-		Z: (fr.Z + to.Z) / 2,
-	}
+	cnt := 1000
 
-	max := 1000
-	cnt := 0
+	segPt := &tooling.Point{}
+	segPt.X = to.X
+	segPt.Y = to.Y
+	segPt.Z = to.Z
+
 	for outOfTolerance {
-		cnt++
-		if cnt > max {
+		cnt--
+		if cnt <= 0 {
 			break
 		}
 
-		// Calculate the angle of the midpoint on the arc
-		midAngle = math.Atan2(mid.Y-center.Y, mid.X-center.X)
+		//
+		// Given a middle angle and the point along the arc
+		// Find the distance between the point on the arc and
+		// the line segment estimating the curve.  When it goes
+		// below the given tolerance, use that incremental angle.
+		// 'max' is used to stop bugs from doing too much damange
+		// during running.  That is dividing things by 1/2 1000 times
+		// is probably always within tolerance.
+		switch planeConst {
+		case planeXConst:
+			midAngle = math.Atan2(segPt.X-center.X, segPt.Z-center.Z)
+			arc = &tooling.Point{
+				Y: center.Y + radius*math.Cos(midAngle),
+				Z: center.Z + radius*math.Sin(midAngle),
+				X: center.X,
+			}
+			break
+		case planeYConst:
+			midAngle = math.Atan2(segPt.Z-center.Z, segPt.X-center.X)
+			arc = &tooling.Point{
+				X: center.X + radius*math.Cos(midAngle),
+				Z: center.Z + radius*math.Sin(midAngle),
+				Y: center.Y,
+			}
+			break
 
-		// Calculate the expected arc position at the midpoint angle
-		arc := tooling.Point{
-			X: center.X + radius*math.Cos(midAngle),
-			Y: center.Y + radius*math.Sin(midAngle),
-			Z: center.Z,
+		case planeZConst:
+			midAngle = math.Atan2(segPt.Y-center.Y, segPt.X-center.X)
+			arc = &tooling.Point{
+				X: center.X + radius*math.Cos(midAngle),
+				Y: center.Y + radius*math.Sin(midAngle),
+				Z: center.Z,
+			}
+			break
 		}
-		arcSegmentDiff := arc.Dist(mid)
 
-		mid.X = (fr.X + mid.X) / 2
-		mid.Y = (fr.Y + mid.Y) / 2
-		mid.Z = (fr.Z + mid.Z) / 2
+		arcSegmentDiff := arc.Dist(segPt)
+
+		if debugArc {
+			log.Printf("TOL @%v SEG: %v ANGLE: %v\n", cnt, segPt, midAngle)
+		}
+
+		segPt.X = arc.X
+		segPt.Y = arc.Y
+		segPt.Z = arc.Z
+
+		//// Cut the mid point in half again.
+		//mid.X = (fr.X + segPt.X) / 2
+		//mid.Y = (fr.Y + segPt.Y) / 2
+		//mid.Z = (fr.Z + segPt.Z) / 2
 
 		if arcSegmentDiff > tolerance {
 			outOfTolerance = true

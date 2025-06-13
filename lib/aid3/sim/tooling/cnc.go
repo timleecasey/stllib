@@ -24,7 +24,7 @@ type Point struct {
 }
 
 func (p *Point) String() string {
-	return fmt.Sprintf("X:%v, Y:%v, Z:%v", p.X, p.Y, p.Z)
+	return fmt.Sprintf("X:%4.3f, Y:%4.3f, Z:%4.3f", p.X, p.Y, p.Z)
 }
 
 func (p *Point) Dist(to *Point) float64 {

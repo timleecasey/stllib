@@ -62,7 +62,7 @@ func (s *Sim) Run(tree *gcode.ParseTree) {
 			break
 
 		case gcode.CMD_CW_ARC:
-			//cmdCwArch(s, cn)
+			cmdCwArch(s, cn)
 			cnt++
 			break
 		case gcode.CMD_CCW_ARC:
