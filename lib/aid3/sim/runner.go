@@ -10,7 +10,8 @@ import (
 )
 
 var debugLinear = false
-var debugArc = true
+var debugArc = false
+var debugPts = false
 
 // Sim
 // TimeSlice is the time unit increment for running the sim
@@ -127,7 +128,7 @@ func (s *Sim) Run(tree *gcode.ParseTree) {
 	})
 
 	writePathPoints(s.ToolHead)
-	log.Printf("Ran %v commands\n", cnt)
+	log.Printf("Ran %v commands %v points\n", cnt, s.ToolHead.PointCount())
 
 }
 
@@ -139,11 +140,17 @@ func notClipped(to *tooling.Point, fr *tooling.Point, diffPt *tooling.Point) boo
 }
 
 func runLinearAffine(s *Sim, affine *tooling.Affine, toPt *tooling.Point, diffPt *tooling.Point) {
+	cnt := 0
 	for notClipped(s.ToolHead.Pos(), toPt, diffPt) {
 		h := s.ToolHead
 		moveHeadBy(h, affine)
+		cnt++
 	}
 	s.ToolHead.MoveTo(toPt)
+	if debugPts {
+		log.Printf("LINEAR PTs simmed %3v posted %v", cnt, cnt)
+	}
+
 }
 
 func moveHeadBy(h tooling.Head, affine *tooling.Affine) {

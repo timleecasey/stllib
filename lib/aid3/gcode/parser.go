@@ -170,6 +170,16 @@ func Parse(srcFileNm string) (*ParseTree, error) {
 	}
 	log.Printf("Found %v tokens\n", tree.nodes.size)
 
+	// Maintain x/y/z and this is the coords
+	// which are carried forward.
+	tree.curCmd = &Cmd{
+		coords: &Coords{
+			X: 0,
+			Y: 0,
+			Z: 0,
+		},
+	}
+
 	if err := MakeGcodeCommands(tree); err != nil {
 		return nil, err
 	}
@@ -217,19 +227,27 @@ func HandleToken(tree *ParseTree, n *Node) error {
 			refTok = tree.curCmd.t
 		}
 		tree.curCmd = &Cmd{
-			c:      prevType,
-			t:      refTok,
-			sibs:   nil,
-			coords: &Coords{},
+			c:    prevType,
+			t:    refTok,
+			sibs: nil,
+			coords: &Coords{
+				X: tree.curCmd.coords.X,
+				Y: tree.curCmd.coords.Y,
+				Z: tree.curCmd.coords.Z,
+			},
 		}
 		break
 
 	case TOK_M:
 		tree.curCmd = &Cmd{
-			c:      CMD_UNKN,
-			t:      t,
-			sibs:   nil,
-			coords: &Coords{},
+			c:    CMD_UNKN,
+			t:    t,
+			sibs: nil,
+			coords: &Coords{
+				X: tree.curCmd.coords.X,
+				Y: tree.curCmd.coords.Y,
+				Z: tree.curCmd.coords.Z,
+			},
 		}
 		switch t.src {
 		case "M5", "M05": // Spindle off
@@ -264,10 +282,14 @@ func HandleToken(tree *ParseTree, n *Node) error {
 		}
 	case TOK_G:
 		tree.curCmd = &Cmd{
-			c:      CMD_UNKN,
-			t:      t,
-			sibs:   nil,
-			coords: &Coords{},
+			c:    CMD_UNKN,
+			t:    t,
+			sibs: nil,
+			coords: &Coords{
+				X: tree.curCmd.coords.X,
+				Y: tree.curCmd.coords.Y,
+				Z: tree.curCmd.coords.Z,
+			},
 		}
 
 		switch t.src {

@@ -6,4 +6,5 @@ type Head interface {
 	Path(f func(p *Point))
 	CurVelocity() *Velocity
 	Reset(zero *Point)
+	PointCount() int
 }

@@ -34,6 +34,24 @@ func (p *Point) Dist(to *Point) float64 {
 	return math.Sqrt((diffX * diffX) + (diffY * diffY) + (diffZ * diffZ))
 }
 
+func PointAt(center *Point, radius float64, angle float64) *Point {
+	ret := &Point{
+		X: center.X + radius*math.Cos(angle),
+		Y: center.Y + radius*math.Sin(angle),
+		Z: center.Z,
+	}
+
+	return ret
+}
+
+func MidPoint(fr *Point, to *Point) *Point {
+	return &Point{
+		X: (fr.X + to.X) / 2,
+		Y: (fr.Y + to.Y) / 2,
+		Z: (fr.Z + to.Z) / 2,
+	}
+}
+
 const (
 	FEED_NONE = iota
 	FEED_INVERSE_TIME

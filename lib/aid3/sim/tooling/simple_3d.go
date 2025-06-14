@@ -111,6 +111,10 @@ func (h *SimpleHead) MoveTo(p *Point) {
 	h.path = append(h.path, p)
 }
 
+func (h *SimpleHead) PointCount() int {
+	return len(h.path)
+}
+
 func (h *SimpleHead) Path(f func(p *Point)) {
 	for i := range h.path {
 		f(h.path[i])
