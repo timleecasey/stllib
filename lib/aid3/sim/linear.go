@@ -36,6 +36,17 @@ func cmdLinear(s *Sim, cn *gcode.CmdNode) {
 			diffPt.Z)
 
 		if distPerSlice > 0 {
+			//
+			// This may not be fine enough for a simulation when
+			// there is deflection and heat, among others.
+			// This is directly calculating an incremental jump in the
+			// simulation time slice, vs calculating a step to a tolerance
+			// and then morking points when past a time slice.
+			//
+			// Also, there is accumulated timeslice errors between linear moves.
+			// A partial time slice is not taken into account at the start of the
+			// next move.  (Diff of 0 is always used, vs diff of previous)
+			//
 			runLinearAffine(s, affine, toPt, diffPt)
 		}
 	}

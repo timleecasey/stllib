@@ -131,7 +131,10 @@ func (h *SimpleHead) Reset(zero *Point) {
 }
 
 func (h *SimpleHead) MarkVelocity(fr *Point, to *Point) {
-	h.curVel.X = to.X - fr.X
-	h.curVel.Y = to.Y - fr.Y
-	h.curVel.Z = to.Z - fr.Z
+	//
+	// Remove the starting point
+	//
+	h.curVel.X = fr.X - to.X
+	h.curVel.Y = fr.Y - to.Y
+	h.curVel.Z = fr.Z - to.Z
 }
