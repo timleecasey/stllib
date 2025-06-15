@@ -12,7 +12,7 @@ type Simple3d struct {
 	feed         float64
 	feedMode     int
 	spindleSpeed int64
-	curTool      int
+	curTool      int64
 	plane        int
 	units        int
 }
@@ -75,7 +75,7 @@ func (s3d *Simple3d) SpindleSpeed(speed int64) {
 	s3d.spindleSpeed = speed
 }
 
-func (s3d *Simple3d) ToolChangeTo(tool int) {
+func (s3d *Simple3d) ToolChangeTo(tool int64) {
 	s3d.curTool = tool
 }
 

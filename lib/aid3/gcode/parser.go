@@ -21,6 +21,7 @@ const (
 	TOK_A
 	TOK_B
 	TOK_C
+	TOK_E
 	TOK_F
 	TOK_G
 	TOK_H
@@ -54,11 +55,15 @@ const (
 	CMD_LINEAR
 	CMD_CW_ARC
 	CMD_CCW_ARC
-	CMD_SPINDLE_OFF
 	CMD_FEED_PER_MIN_MODE
 	CMD_INVERSE_TIME_FEED
 	CMD_FEED_PER_REVOLUTION
+	CMD_COOLANT_ON
+	CMD_COOLANT_OFF
 	CMD_SPINDLE_SPEED
+	CMD_SPINDLE_OFF
+	CMD_SPINDLE_CW
+	CMD_SPINDLE_CCW
 	CMD_TOOL_CHANGE
 	CMD_PLANE_XY
 	CMD_PLANE_XZ
@@ -118,6 +123,8 @@ type Coords struct {
 	B float64
 	C float64
 
+	E float64 // extruder rate
+
 	F float64
 	// G is missing, of course
 	H float64
@@ -170,13 +177,15 @@ func Parse(srcFileNm string) (*ParseTree, error) {
 	}
 	log.Printf("Found %v tokens\n", tree.nodes.size)
 
-	// Maintain x/y/z and this is the coords
-	// which are carried forward.
+	//// Maintain x/y/z and this is the coords
+	//// which are carried forward.
 	tree.curCmd = &Cmd{
 		coords: &Coords{
 			X: 0,
 			Y: 0,
 			Z: 0,
+
+			F: 0,
 		},
 	}
 
@@ -193,6 +202,23 @@ func MakeGcodeCommands(t *ParseTree) error {
 		return err
 	}
 	return nil
+}
+
+func carryForward(from *Coords) *Coords {
+	if from == nil {
+		return &Coords{
+			X: 0,
+			Y: 0,
+			Z: 0,
+			F: 0,
+		}
+	}
+	return &Coords{
+		X: from.X,
+		Y: from.Y,
+		Z: from.Z,
+		F: from.F,
+	}
 }
 
 func HandleToken(tree *ParseTree, n *Node) error {
@@ -227,27 +253,19 @@ func HandleToken(tree *ParseTree, n *Node) error {
 			refTok = tree.curCmd.t
 		}
 		tree.curCmd = &Cmd{
-			c:    prevType,
-			t:    refTok,
-			sibs: nil,
-			coords: &Coords{
-				X: tree.curCmd.coords.X,
-				Y: tree.curCmd.coords.Y,
-				Z: tree.curCmd.coords.Z,
-			},
+			c:      prevType,
+			t:      refTok,
+			sibs:   nil,
+			coords: carryForward(tree.curCmd.coords),
 		}
 		break
 
 	case TOK_M:
 		tree.curCmd = &Cmd{
-			c:    CMD_UNKN,
-			t:    t,
-			sibs: nil,
-			coords: &Coords{
-				X: tree.curCmd.coords.X,
-				Y: tree.curCmd.coords.Y,
-				Z: tree.curCmd.coords.Z,
-			},
+			c:      CMD_UNKN,
+			t:      t,
+			sibs:   nil,
+			coords: carryForward(tree.curCmd.coords),
 		}
 		switch t.src {
 		case "M5", "M05": // Spindle off
@@ -256,10 +274,22 @@ func HandleToken(tree *ParseTree, n *Node) error {
 			break
 
 		case "M0", "M00": // Program stop
+			tree.curCmd.c = CMD_SPINDLE_OFF
+			tree.AddCmd(tree.curCmd)
+			break
+
 		case "M1", "M01": // Optional program stop
 		case "M2", "M02": // end of program
+			break
+
 		case "M3", "M03": // Spindle on clockwise
+			tree.curCmd.c = CMD_SPINDLE_CW
+			tree.AddCmd(tree.curCmd)
+			break
+
 		case "M4", "M04": // Spindle on counterclockwise
+			tree.curCmd.c = CMD_SPINDLE_CCW
+			tree.AddCmd(tree.curCmd)
 			break
 
 		case "M6", "M06": // Manual tool change
@@ -267,7 +297,15 @@ func HandleToken(tree *ParseTree, n *Node) error {
 
 		case "M7", "M07": // Coolant on (mist)
 		case "M8", "M08": // Coolant on
+			tree.curCmd.c = CMD_COOLANT_ON
+			tree.AddCmd(tree.curCmd)
+			break
+
 		case "M9", "M09": // Coolant off
+			tree.curCmd.c = CMD_COOLANT_ON
+			tree.AddCmd(tree.curCmd)
+			break
+
 		case "M10": // Clamp on
 		case "M11": // Clamp off
 		case "M19": // Spindle orientation
@@ -282,14 +320,10 @@ func HandleToken(tree *ParseTree, n *Node) error {
 		}
 	case TOK_G:
 		tree.curCmd = &Cmd{
-			c:    CMD_UNKN,
-			t:    t,
-			sibs: nil,
-			coords: &Coords{
-				X: tree.curCmd.coords.X,
-				Y: tree.curCmd.coords.Y,
-				Z: tree.curCmd.coords.Z,
-			},
+			c:      CMD_UNKN,
+			t:      t,
+			sibs:   nil,
+			coords: carryForward(tree.curCmd.coords),
 		}
 
 		switch t.src {
@@ -398,6 +432,14 @@ func HandleToken(tree *ParseTree, n *Node) error {
 	case TOK_META:
 		tree.curCmd.c = CMD_META
 		break
+	case TOK_E:
+		if e, err := strconv.ParseFloat(t.src[1:], 64); tree.curCmd == nil || err != nil {
+			return genErr(fmt.Sprintf("Could not parse %v @ %v : %v", t.src, t.lnPos, err))
+		} else {
+			tree.curCmd.coords.E = e
+		}
+		break
+
 	case TOK_F:
 		if f, err := strconv.ParseFloat(t.src[1:], 64); tree.curCmd == nil || err != nil {
 			return genErr(fmt.Sprintf("Could not parse %v @ %v : %v", t.src, t.lnPos, err))
@@ -495,12 +537,22 @@ func HandleToken(tree *ParseTree, n *Node) error {
 		break
 
 	case TOK_T:
-		tree.curCmd.c = CMD_TOOL_CHANGE
+		tree.curCmd = &Cmd{
+			c:      CMD_TOOL_CHANGE,
+			t:      t,
+			sibs:   nil,
+			coords: carryForward(tree.curCmd.coords),
+		}
 		tree.AddCmd(tree.curCmd)
 		break
 
 	case TOK_S:
-		tree.curCmd.c = CMD_SPINDLE_SPEED
+		tree.curCmd = &Cmd{
+			c:      CMD_SPINDLE_SPEED,
+			t:      t,
+			sibs:   nil,
+			coords: carryForward(tree.curCmd.coords),
+		}
 		tree.AddCmd(tree.curCmd)
 		break
 

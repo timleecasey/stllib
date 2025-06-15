@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"strconv"
 )
 
 var debugLinear = false
@@ -72,16 +73,20 @@ func (s *Sim) Run(tree *gcode.ParseTree) {
 			break
 
 		case gcode.CMD_TOOL_CHANGE:
-			err = cmdToolChange(s, cn)
+			var tool int64
+			tool, err = cmdSrcToInt(cn)
+			cmdToolChange(s, tool)
 			cnt++
 			break
 
 		case gcode.CMD_SPINDLE_SPEED:
-			err = cmdSpindleSpeed(s, cn)
+			var speed int64
+			speed, err = cmdSrcToInt(cn)
+			cmdSpindleSpeed(s, speed)
 			cnt++
 			break
 		case gcode.CMD_SPINDLE_OFF:
-			s.Tool.SpindleSpeed(0)
+			cmdSpindleSpeed(s, 0)
 			cnt++
 			break
 
@@ -128,6 +133,7 @@ func (s *Sim) Run(tree *gcode.ParseTree) {
 	})
 
 	writePathPoints(s.ToolHead)
+
 	log.Printf("Ran %v commands %v points\n", cnt, s.ToolHead.PointCount())
 
 }
@@ -190,4 +196,14 @@ func writePathPoints(h tooling.Head) {
 	} else {
 		log.Printf("Could not write path.gcode : %v", err)
 	}
+}
+
+func cmdSrcToInt(cn *gcode.CmdNode) (int64, error) {
+	src := cn.Cmd.Src()
+	valueStr := src[1:]
+	value, err := strconv.ParseInt(valueStr, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return value, nil
 }

@@ -1,18 +1,10 @@
 package sim
 
 import (
-	"github.com/timleecasey/stllib/lib/aid3/gcode"
-	"strconv"
+	"fmt"
 )
 
-func cmdToolChange(s *Sim, cn *gcode.CmdNode) error {
-	src := cn.Cmd.Src()
-	toolStr := src[1:]
-	if tool, err := strconv.ParseInt(toolStr, 10, 32); err != nil {
-		s.Tool.SpindleSpeed(tool)
-	} else {
-		return err
-	}
-	return nil
-
+func cmdToolChange(s *Sim, tool int64) {
+	fmt.Printf("CHANGE TOOL %v\n", tool)
+	s.Tool.ToolChangeTo(tool)
 }

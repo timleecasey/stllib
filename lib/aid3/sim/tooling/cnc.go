@@ -81,7 +81,7 @@ type Cnc interface {
 	FastFeedRate() float64
 	FeedMode(mode int)
 	SpindleSpeed(speed int64)
-	ToolChangeTo(tool int)
+	ToolChangeTo(tool int64)
 	SelectPlane(plane int)
 	Plane() int
 	Reset()
