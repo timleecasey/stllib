@@ -7,4 +7,5 @@ type Head interface {
 	CurVelocity() *Velocity
 	Reset(zero *Point)
 	PointCount() int
+	Shape() *Mesh
 }

@@ -138,3 +138,19 @@ func (h *SimpleHead) MarkVelocity(fr *Point, to *Point) {
 	h.curVel.Y = fr.Y - to.Y
 	h.curVel.Z = fr.Z - to.Z
 }
+
+func (h *SimpleHead) Shape() *Mesh {
+	ret := &Mesh{}
+	var p1, p2, p3, p4 *Point
+	p1 = &Point{1, 0, 0}
+	p2 = &Point{-1, 0, 0}
+	p3 = &Point{0, 1, 0}
+	p3 = &Point{0, 0, 1}
+
+	ret.AddTriangle(p1, p2, p3) // bottom side
+	ret.AddTriangle(p4, p3, p1) // right side
+	ret.AddTriangle(p4, p2, p3) // left side
+	ret.AddTriangle(p4, p1, p2) // back side
+	
+	return ret
+}

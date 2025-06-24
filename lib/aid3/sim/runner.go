@@ -23,6 +23,7 @@ type Sim struct {
 	Tool      tooling.Cnc
 	ToolHead  tooling.Head
 	Tolerance float64
+	Vol       tooling.Volume
 }
 
 func (s *Sim) Start() {
@@ -35,97 +36,21 @@ func (s *Sim) Start() {
 	s.ToolHead = head
 	s.Tool = tool
 
+	s.Vol = tooling.MakeVolume(&tooling.Point{X: -20, Y: -20, Z: -20}, &tooling.Point{X: 20, Y: 20, Z: 20})
+
 	s.Tolerance = 0.01 // 0.01 mm?
 }
+
+var cmdCnt int
 
 func (s *Sim) Run(tree *gcode.ParseTree) {
 
 	log.Printf("Start %v\n", s.Tool.Head().Pos())
 
-	cnt := 0
+	cmdCnt = 0
 
 	tree.TraverseCmds(func(cn *gcode.CmdNode) error {
-		var err error
-		err = nil
-
-		if cn.Cmd.Coords().F != 0 {
-			s.Tool.AssignFeedRate(cn.Cmd.Coords().F)
-		}
-
-		switch cn.Cmd.CmdType() {
-		case gcode.CMD_FAST:
-			s.Tool.AssignFeedRate(s.Tool.FastFeedRate())
-			cmdLinear(s, cn)
-			cnt++
-			break
-		case gcode.CMD_LINEAR:
-			cmdLinear(s, cn)
-			cnt++
-			break
-
-		case gcode.CMD_CW_ARC:
-			cmdCwArch(s, cn)
-			cnt++
-			break
-		case gcode.CMD_CCW_ARC:
-			cmdCcwArch(s, cn)
-			cnt++
-			break
-
-		case gcode.CMD_TOOL_CHANGE:
-			var tool int64
-			tool, err = cmdSrcToInt(cn)
-			cmdToolChange(s, tool)
-			cnt++
-			break
-
-		case gcode.CMD_SPINDLE_SPEED:
-			var speed int64
-			speed, err = cmdSrcToInt(cn)
-			cmdSpindleSpeed(s, speed)
-			cnt++
-			break
-		case gcode.CMD_SPINDLE_OFF:
-			cmdSpindleSpeed(s, 0)
-			cnt++
-			break
-
-		case gcode.CMD_FEED_PER_MIN_MODE:
-			s.Tool.FeedMode(tooling.FEED_PER_MINUTE)
-			cnt++
-			break
-		case gcode.CMD_INVERSE_TIME_FEED: // feed is time instead of rate
-			s.Tool.FeedMode(tooling.FEED_INVERSE_TIME)
-			cnt++
-			break
-		case gcode.CMD_FEED_PER_REVOLUTION:
-			s.Tool.FeedMode(tooling.FEED_PER_REVOLUTION)
-			cnt++
-			break
-
-		case gcode.CMD_PLANE_XY:
-			s.Tool.SelectPlane(tooling.PLANE_XY)
-			cnt++
-			break
-		case gcode.CMD_PLANE_XZ:
-			s.Tool.SelectPlane(tooling.PLANE_XZ)
-			cnt++
-			break
-		case gcode.CMD_PLANE_YZ:
-			s.Tool.SelectPlane(tooling.PLANE_YZ)
-			cnt++
-			break
-
-		case gcode.CMD_INCH:
-			s.Tool.Units(tooling.UNIT_INCH)
-			cnt++
-			break
-		case gcode.CMD_MM:
-			s.Tool.Units(tooling.UNIT_MM)
-			cnt++
-			break
-
-		}
+		err := cmdVisitor(s, cn)
 		if debugLinear {
 			log.Printf("After %v %v F: %v\n", cn.Cmd.Src(), s.Tool.Head().Pos(), s.Tool.FeedRate())
 		}
@@ -134,8 +59,94 @@ func (s *Sim) Run(tree *gcode.ParseTree) {
 
 	writePathPoints(s.ToolHead)
 
-	log.Printf("Ran %v commands %v points\n", cnt, s.ToolHead.PointCount())
+	log.Printf("Ran %v commands %v points\n", cmdCnt, s.ToolHead.PointCount())
 
+	subtractPathPoints(s)
+}
+
+func cmdVisitor(s *Sim, cn *gcode.CmdNode) error {
+	var err error
+	err = nil
+
+	if cn.Cmd.Coords().F != 0 {
+		s.Tool.AssignFeedRate(cn.Cmd.Coords().F)
+	}
+
+	switch cn.Cmd.CmdType() {
+	case gcode.CMD_FAST:
+		s.Tool.AssignFeedRate(s.Tool.FastFeedRate())
+		cmdLinear(s, cn)
+		cmdCnt++
+		break
+	case gcode.CMD_LINEAR:
+		cmdLinear(s, cn)
+		cmdCnt++
+		break
+
+	case gcode.CMD_CW_ARC:
+		cmdCwArch(s, cn)
+		cmdCnt++
+		break
+	case gcode.CMD_CCW_ARC:
+		cmdCcwArch(s, cn)
+		cmdCnt++
+		break
+
+	case gcode.CMD_TOOL_CHANGE:
+		var tool int64
+		tool, err = cmdSrcToInt(cn)
+		cmdToolChange(s, tool)
+		cmdCnt++
+		break
+
+	case gcode.CMD_SPINDLE_SPEED:
+		var speed int64
+		speed, err = cmdSrcToInt(cn)
+		cmdSpindleSpeed(s, speed)
+		cmdCnt++
+		break
+	case gcode.CMD_SPINDLE_OFF:
+		cmdSpindleSpeed(s, 0)
+		cmdCnt++
+		break
+
+	case gcode.CMD_FEED_PER_MIN_MODE:
+		s.Tool.FeedMode(tooling.FEED_PER_MINUTE)
+		cmdCnt++
+		break
+	case gcode.CMD_INVERSE_TIME_FEED: // feed is time instead of rate
+		s.Tool.FeedMode(tooling.FEED_INVERSE_TIME)
+		cmdCnt++
+		break
+	case gcode.CMD_FEED_PER_REVOLUTION:
+		s.Tool.FeedMode(tooling.FEED_PER_REVOLUTION)
+		cmdCnt++
+		break
+
+	case gcode.CMD_PLANE_XY:
+		s.Tool.SelectPlane(tooling.PLANE_XY)
+		cmdCnt++
+		break
+	case gcode.CMD_PLANE_XZ:
+		s.Tool.SelectPlane(tooling.PLANE_XZ)
+		cmdCnt++
+		break
+	case gcode.CMD_PLANE_YZ:
+		s.Tool.SelectPlane(tooling.PLANE_YZ)
+		cmdCnt++
+		break
+
+	case gcode.CMD_INCH:
+		s.Tool.Units(tooling.UNIT_INCH)
+		cmdCnt++
+		break
+	case gcode.CMD_MM:
+		s.Tool.Units(tooling.UNIT_MM)
+		cmdCnt++
+		break
+
+	}
+	return err
 }
 
 func notClipped(to *tooling.Point, fr *tooling.Point, diffPt *tooling.Point) bool {
@@ -196,6 +207,16 @@ func writePathPoints(h tooling.Head) {
 	} else {
 		log.Printf("Could not write path.gcode : %v", err)
 	}
+}
+
+func subtractPathPoints(s *Sim) {
+	h := s.ToolHead
+	v := s.Vol
+	headShape := h.Shape()
+	h.Path(func(p *tooling.Point) {
+		v.Subtract(headShape)
+	})
+
 }
 
 func cmdSrcToInt(cn *gcode.CmdNode) (int64, error) {
