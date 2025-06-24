@@ -15,6 +15,8 @@ type Simple3d struct {
 	curTool      int64
 	plane        int
 	units        int
+	workVolume   Volume
+	material     Material
 }
 
 type SimpleHead struct {
@@ -23,8 +25,10 @@ type SimpleHead struct {
 	curVel *Velocity
 }
 
-func BuildCnc() Cnc {
+func BuildCnc(m Material) Cnc {
 	ret := &Simple3d{}
+	ret.workVolume = MakeVolume(&Point{X: -20, Y: -20, Z: -20}, &Point{X: 20, Y: 20, Z: 20})
+	ret.material = m
 
 	head := &SimpleHead{
 		pos:    &Point{0, 0, 0},
@@ -84,6 +88,14 @@ func (s3d *Simple3d) SelectPlane(plane int) {
 }
 func (s3d *Simple3d) Plane() int {
 	return s3d.plane
+}
+
+func (s3d *Simple3d) WorkVolume() Volume {
+	return s3d.workVolume
+}
+
+func (s3d *Simple3d) Material() Material {
+	return s3d.material
 }
 
 func (s3d *Simple3d) Reset() {
@@ -151,6 +163,6 @@ func (h *SimpleHead) Shape() *Mesh {
 	ret.AddTriangle(p4, p3, p1) // right side
 	ret.AddTriangle(p4, p2, p3) // left side
 	ret.AddTriangle(p4, p1, p2) // back side
-	
+
 	return ret
 }

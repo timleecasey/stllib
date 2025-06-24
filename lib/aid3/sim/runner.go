@@ -29,7 +29,7 @@ type Sim struct {
 func (s *Sim) Start() {
 	s.TimeSlice = 0.001
 
-	tool := tooling.BuildCnc()
+	tool := tooling.BuildCnc(tooling.MakeWood(15.))
 	head := tool.Head()
 	tool.Reset()
 

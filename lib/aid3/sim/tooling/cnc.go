@@ -86,4 +86,6 @@ type Cnc interface {
 	Plane() int
 	Reset()
 	Units(units int)
+	WorkVolume() Volume
+	Material() Material
 }

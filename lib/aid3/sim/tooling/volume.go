@@ -1,6 +1,8 @@
 package tooling
 
-import "math"
+import (
+	"math"
+)
 
 // https://github.com/hschendel/stl/blob/master/solid.go
 // https://github.com/github/gh-skyline/blob/main/internal/stl/geometry/shapes.go
